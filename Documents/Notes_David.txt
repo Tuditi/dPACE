@@ -1,0 +1,59 @@
+Car Sharing forms:
+
+1) Two-way (Station-based): same start & drop off spot
+2) One-way (Station-based): Several docking stations, only drop-off/pick-up @ docking station, but doesn't have to be the same.
+3) Free-floating: (e.g. Mobike) Inside the operating area cars are free to be anywhere. Enabled by pervasion of ICT
+4) Peer-to-peer: Car owners are able to rent their car to other users. (Check Turo)
+
+
+Reasons that car sharing will prevail:
+- One shared car can replace 8 private cars 
+- Decrease in the importance of car ownership
+- Increasing pervasiveness of ICT
+
+Actors in the car sharing business:
+* OEM (e.g. Audi): They manufacture the cars with/without an OBU, that can communicate with the user and owner
+It should also involve some unique identifiers in order to create access tokens later on.
+Can also be the owner of the car. e.g. DriveNow, Car2go
+
+Question: Motivation if not the car owner?
+
+*Owners:
+incentives: earn money/help environment
+unique properties: - have some kind of private key/proof of car ownage
+		   - 
+
+concerns: 	   - car can't be stolen
+		   - car can't be damaged
+		   - receive correct funds
+		   - don't get a fine for not respecting rules by customer
+
+maliciousness:	   - Say that car is broken, when it isn't
+		   - say car isn't at its place, when it is. Oracle?
+		   - Lie about existence of car
+		   - Charge more than is fair
+		   - Discriminate drivers
+		   - Release sensitive information on drivers
+		   - Provide wrong information
+
+*Users:
+incentives: cheaper to use than to own/convenient travel way
+unique properties: - Have an access token that enables them to use a car according to specific details
+
+concerns:	 - Get the right car
+		 - Don't pay more than supposed to
+		 - Enough flexibility
+		 - Get a nice car (no damage, full tank, clean, accessible)
+		 - Convenient usage: unlock/lock
+
+maliciousness:	 - tamper secure hardware
+		 - break something
+		 - get a fine -> let owner pay
+		 - don't put car back at the right spot
+		 - steal the car
+		 - use it for a longer period
+	         - provide wrong details (e.g. ID)
+		 - re-use key
+
+
+*Service providers
