@@ -45,7 +45,7 @@ contract MassCarSharing{
     }
 
     struct owner{
-        address owner;
+        address addr;
         uint    balance;
 
         string  name;
@@ -53,16 +53,17 @@ contract MassCarSharing{
     }
 
     struct renter{
-        address renter;
+        address addr;
         uint    balance;
 
+        bytes32 proof;
         bool    validated;
         string  carIdentifier;
     }
 
     //Variables
     address LocationContract;
-    address REGISTRATION_SERVICE;        //They are the ones who check whether the signature is valid
+    address REGISTRATION_SERVICE = 0x1900A200412d6608BaD736db62Ba3352b1a661F2;//They are the ones who check whether the signature is valid
     uint DEPOSIT = 5 ether;
 
     mapping (string  => car)    carList;
@@ -89,6 +90,12 @@ contract MassCarSharing{
         require(carList[_identifier].owner == address(0),'Car already initialized');
         _;
     }
+
+    //Events
+    event E_deployedCar(address indexed _carOwner, string _identifier, uint _ownerBalance);
+    event E_registeredRenter(address indexed _carRenter, uint _renterBalance, bytes32 _proof);
+    event E_carRented(address indexed _carOwner, address indexed _carRenter, string _identifier, bytes _accessToken);
+    event E_endRent(address indexed _endingParty, string _identifier, uint _fee);
 
     //1a. Create a car entry, when a new car is available for rent.
     function deployCar(
@@ -117,8 +124,10 @@ contract MassCarSharing{
     ownerList[msg.sender] = owner(
         msg.sender, //owner
         msg.value,  //balance
-        _identifier, //carIdentifier
-        _ownerName); //name
+        _ownerName, //name
+        _identifier); //carIdentifier
+
+        emit E_deployedCar(msg.sender, _identifier, ownerList[msg.sender].balance);
     }
         
     //1b. If a Renter has a signed proof that he is registered in the system and has put a deposit, he is entered inside the system.
@@ -130,31 +139,26 @@ contract MassCarSharing{
         renterList[msg.sender] = renter(
             msg.sender,
             msg.value,
+            _proof,
             true,
             ""
         );
+        emit E_registeredRenter(msg.sender, msg.value, _proof);
     }
     
-    //test function instead of creating the actual proofs
-    function enterRenterTEST() public payable{
-        require(msg.value >= DEPOSIT,'Not enough deposit to enter system');
-        require(renterList[msg.sender].validated == false, 'Renter already in the system');
-        renterList[msg.sender] = renter(
-            msg.sender,
-            msg.value,
-            true,
-            ""
-        );
-    }
     
     //2 Book a car based on identifier
     function rentCar(string memory _carIdentifier) public returns(bytes memory){
         require(renterList[msg.sender].balance >= DEPOSIT,'Not enough balance, please fund account');
         require(keccak256(abi.encode(renterList[msg.sender].carIdentifier)) == keccak256(""), 'Please return previous car');
         require(carList[_carIdentifier].contractStep == 0, 'Car currently in use, pick other car!');
+
         carList[_carIdentifier].contractStep++;
         carList[_carIdentifier].driveStartTime = now;
+
+        emit E_carRented(carList[_carIdentifier].owner, carList[_carIdentifier].renter, _carIdentifier, carList[_carIdentifier].accessToken);
         return carList[_carIdentifier].accessToken;
+
     }
     
     
@@ -168,11 +172,13 @@ contract MassCarSharing{
         renterList[_car.renter].carIdentifier = "";
         _car.renter = address(0);
         _car.contractStep = 0;                   //Owner deposit needs to be checked
+        emit E_endRent(msg.sender, _carIdentifier, _fee);
+
     }
     
     
     //Check whether registry service has signed off that a renter is allowed to drive the car
-    function isSignatureValid(address _address, bytes32 _proof, uint8 _v, bytes32 _r, bytes32 _s) private view returns(bool) {
+    function isSignatureValid(address _address, bytes32 _proof, uint8 _v, bytes32 _r, bytes32 _s) private pure returns(bool) {
         address _signer = ecrecover(_proof, _v, _r, _s);  //possible some manipulation needed to get proof in proper form...
         return(_signer == _address);
     }
