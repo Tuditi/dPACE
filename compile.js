@@ -8,7 +8,7 @@ const solc = require('solc');
 
 // the path to MassCarSharing.sol, __dirname is a constant defined by node and
 // will always return the valid current working directory
-const massCarSharingPath = path.resolve(__dirname, 'contracts', 'massCarSharing.sol');
+const massCarSharingPath = path.resolve(__dirname, 'contracts', 'privCarSharing.sol');
 // This reads the contents of the file using the filesystem (fs) module
 const source = fs.readFileSync(massCarSharingPath, 'UTF-8');
 

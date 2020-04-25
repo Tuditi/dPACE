@@ -37,7 +37,6 @@ const {abi, evm} = require('../compile');
 const MAX_GAS = '6721975';
 
 let contract;     //Holds instance of our contract
-let accounts;       //Holds instances of all accounts
 
 let location = 'Berendrecht';
 let identifier = '001';
@@ -45,9 +44,7 @@ let ownerName = 'Rita';
 let accessToken = '0x0000';
 let pricePerBlock = 2;
 
-var proofOfRegistration = "David has a valid driver's license";
-let encryptedProof;
-
+var proofOfRegistration = "Valid driver's license";
 
 beforeEach(async() => {
     const ganacheProvider = ganache.provider({
@@ -84,20 +81,20 @@ describe('Enter Renter', () => {
 
         const proofHash = EthCrypto.hash.keccak256([
             {// prefix
-        type: 'string',
-        value: 'Registration Proof:'
-    }, { // contractAddress
-        type: 'address',
-        value: user0Address
-    }, { // proof of registration is contained here
-        type: 'string',
-        value: proofOfRegistration
-    }
-]);
+                type: 'string',
+                value: 'Registration Proof:'
+            }, { // contractAddress
+                type: 'address',
+                value: user0Address
+            }, { // proof of registration is contained here
+                type: 'string',
+                value: proofOfRegistration
+            }]);
+            
         const signature_0 = EthCrypto.sign(privateKeyRSP,proofHash);
         const vrs0 = EthCrypto.vrs.fromString(signature_0);
 
-        await contract.methods.enterRenter(proofHash, vrs0.v, vrs0.r, vrs0.s).send({
+        await contract.methods.enterRenter('David',proofHash, vrs0.v, vrs0.r, vrs0.s).send({
             from: user0.address,
             value: web3.utils.toWei('5','ether'),
             gas: MAX_GAS
@@ -108,9 +105,9 @@ describe('Enter Renter', () => {
         assert.equal(renter.addr, user0Address);
         assert.equal(renter.balance, web3.utils.toWei('5','ether'));
         assert.equal(renter.proof, proofHash);
-        assert.equal(renter.validated, true);
-        assert.equal(renter.carIdentifier,'');
-       
+        assert.equal(renter.driving, false);
+        assert.equal(renter.car,'0x0000000000000000000000000000000000000000');
+        assert.equal(renter.name,'David');   
     });
     
     it('Valid signature1, not enough ether', async() => {
@@ -128,7 +125,7 @@ describe('Enter Renter', () => {
         const signature_1 = EthCrypto.sign(privateKeyRSP,proofHash);
         const vrs1 = EthCrypto.vrs.fromString(signature_1);
 
-        try {await contract.methods.enterRenter(proofHash, vrs1.v, vrs1.r, vrs1.s).send({
+        try {await contract.methods.enterRenter('Kristof',proofHash, vrs1.v, vrs1.r, vrs1.s).send({
             from: user1.address,
             value: web3.utils.toWei('4','ether'),
             gas: MAX_GAS
@@ -154,7 +151,7 @@ describe('Enter Renter', () => {
         const signature_2 = EthCrypto.sign(privateKeyRSP,proofHash);
         const vrs2 = EthCrypto.vrs.fromString(signature_2);
 
-        await contract.methods.enterRenter(proofHash, vrs2.v, vrs2.r, vrs2.s).send({
+        await contract.methods.enterRenter('Kristof',proofHash, vrs2.v, vrs2.r, vrs2.s).send({
             from: user2.address,
             value: web3.utils.toWei('5','ether'),
             gas: MAX_GAS
@@ -165,35 +162,44 @@ describe('Enter Renter', () => {
         assert.equal(renter.addr, user2.address);
         assert.equal(renter.balance, web3.utils.toWei('5','ether'));
         assert.equal(renter.proof, proofHash);
-        assert.equal(renter.validated, true);
-        assert.equal(renter.carIdentifier,'');
-       
+        assert.equal(renter.driving, false);
+        assert.equal(renter.car,'0x0000000000000000000000000000000000000000');
+        assert.equal(renter.name,'Kristof');
     });
 
     it('Valid signature2, but already inside list of renters', async() => {
         const proofHash = EthCrypto.hash.keccak256([
             {// prefix
-        type: 'string',
-        value: 'Registration Proof:'
-    }, { // contractAddress
-        type: 'address',
-        value: user2Address
-    }, { // proof of registration is contained here
-        type: 'string',
-        value: proofOfRegistration
-    }]);
+                type: 'string',
+                value: 'Registration Proof:'
+            }, { // contractAddress
+                type: 'address',
+                value: user0Address
+            }, { // proof of registration is contained here
+                type: 'string',
+                value: proofOfRegistration
+            }]);
+            
         const signature_2 = EthCrypto.sign(privateKeyRSP,proofHash);
         const vrs2 = EthCrypto.vrs.fromString(signature_2);
 
+        await contract.methods.enterRenter('David',proofHash, vrs2.v, vrs2.r, vrs2.s).send({
+            from: user2.address,
+            value: web3.utils.toWei('5','ether'),
+            gas: MAX_GAS
+        });
+
         try{ 
-            await contract.methods.enterRenter(proofHash, vrs2.v, vrs2.r, vrs2.s).send({
+            await contract.methods.enterRenter('David', proofHash, vrs2.v, vrs2.r, vrs2.s).send({
                 from: user2.address,
                 value: web3.utils.toWei('5','ether'),
                 gas: MAX_GAS
             });
         } catch(err) {
             assert(err);
+            return;
         };
+        assert(false);
        
     })
 })

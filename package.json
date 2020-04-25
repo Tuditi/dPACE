@@ -46,7 +46,7 @@
     "mocha": "^4.1.0"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "mocha --timeout 10000"
   },
   "repository": {
     "type": "git",

@@ -26,6 +26,12 @@ The state of the contract contains three entitities that can interact:
     Car,
     balance
 }
+Car HW contact
+{
+  address: '0x5ba7c96BB7707A83AFC2150BfFC81715c3090F04',
+  privateKey: '0x6bc48fee787b0809c3e8fe3fe854e9319ff2d50fbbe5f6d5f1dc3c2602d56ac4',
+  publicKey: '1fa124c4281fab15064cd5072f60bb6bd925aaa097b22d6fc6c61e019434349802f7898e3849f4ef6aaf8ce052cf6df8ca6ea6ff4072392f6726ae0e8db4760d'
+}
 */
 
 contract MassCarSharing{
@@ -39,7 +45,7 @@ contract MassCarSharing{
         uint    pricePerBlock;
         uint    driveStartTime;
 
-        bytes   accessToken;        //How to encode this?
+        bytes32 accessToken;        //How to encode this?
         string  location;
         string  identifier;
     }
@@ -57,8 +63,9 @@ contract MassCarSharing{
         uint    balance;
 
         bytes32 proof;
+        bytes32 accessToken;    //How to encode this?
         bool    validated;
-        string  carIdentifier;
+        bool    access;
     }
 
     //Variables
@@ -66,9 +73,9 @@ contract MassCarSharing{
     address REGISTRATION_SERVICE = 0x1900A200412d6608BaD736db62Ba3352b1a661F2;//They are the ones who check whether the signature is valid
     uint DEPOSIT = 5 ether;
 
-    mapping (string  => car)    carList;
-    mapping (address => owner)  ownerList;
-    mapping (address => renter) renterList;
+    mapping (address => car)    carList;    // private
+    mapping (address => owner)  ownerList;  // private
+    mapping (address => renter) renterList; // private
 
     //Modifiers
     modifier callerIsRenter(car storage _car){
@@ -86,23 +93,24 @@ contract MassCarSharing{
         _;
     }
 
-    modifier carUndeployed(string memory _identifier){
+    modifier carUndeployed(address _identifier){
         require(carList[_identifier].owner == address(0),'Car already initialized');
         _;
     }
 
     //Events
-    event E_deployedCar(address indexed _carOwner, string _identifier, uint _ownerBalance);
+    event E_deployedCar(address indexed _carOwner, address indexed _carAddress, uint _ownerBalance);
     event E_registeredRenter(address indexed _carRenter, uint _renterBalance, bytes32 _proof);
-    event E_carRented(address indexed _carOwner, address indexed _carRenter, string _identifier, bytes _accessToken);
-    event E_endRent(address indexed _endingParty, string _identifier, uint _fee);
+    event E_carRented(address indexed _carOwner, address indexed _carRenter, address _carAddress, bytes32 indexed _accessToken);
+    event E_endRent(address indexed _endingParty, address indexed _identifier, uint _fee);
 
     //1a. Create a car entry, when a new car is available for rent.
     function deployCar(
         string memory _location,
-        string memory _identifier,
         string memory _ownerName,
-        bytes  memory _accessToken,
+        string memory _carName,
+        address       _identifier,
+        bytes32       _accessToken,
         uint          _pricePerHour
         )
         public
@@ -113,19 +121,19 @@ contract MassCarSharing{
     carList[_identifier] = car(
         msg.sender,             //Owner
         address(0),             //Renter, initialized 0
-        address(0),             //Car hardware address
+        _identifier,            //Car hardware address -> currently equal to RSP
         0,                      //Initialize contract step --> secure programming best practice
         _pricePerHour,
         now,                    //driveStartTime, exact time not that important here
         _accessToken,
         _location,
-        _identifier);
+        _carName);
 
     ownerList[msg.sender] = owner(
         msg.sender, //owner
         msg.value,  //balance
         _ownerName, //name
-        _identifier); //carIdentifier
+        _carName); //carIdentifier
 
         emit E_deployedCar(msg.sender, _identifier, ownerList[msg.sender].balance);
     }
@@ -140,36 +148,39 @@ contract MassCarSharing{
             msg.sender,
             msg.value,
             _proof,
+            '',
             true,
-            ""
-        );
+            false
+            );
         emit E_registeredRenter(msg.sender, msg.value, _proof);
     }
     
     
     //2 Book a car based on identifier
-    function rentCar(string memory _carIdentifier) public returns(bytes memory){
+    function rentCar(address _carIdentifier) public {
         require(renterList[msg.sender].balance >= DEPOSIT,'Not enough balance, please fund account');
-        require(keccak256(abi.encode(renterList[msg.sender].carIdentifier)) == keccak256(""), 'Please return previous car');
+        require(!renterList[msg.sender].access, 'Please return previous car');
         require(carList[_carIdentifier].contractStep == 0, 'Car currently in use, pick other car!');
 
+        carList[_carIdentifier].renter = msg.sender;
         carList[_carIdentifier].contractStep++;
         carList[_carIdentifier].driveStartTime = now;
-
+        renterList[msg.sender].access = true;
         emit E_carRented(carList[_carIdentifier].owner, carList[_carIdentifier].renter, _carIdentifier, carList[_carIdentifier].accessToken);
-        return carList[_carIdentifier].accessToken;
+        renterList[msg.sender].accessToken = carList[_carIdentifier].accessToken;
 
     }
     
     
     //3 End booking, needs to be public, because it can be called by owner/renter
-    function endRentCar(string memory _carIdentifier) public involvedParties(carList[_carIdentifier]) {
+    function endRentCar(address _carIdentifier) public involvedParties(carList[_carIdentifier]) {
         car storage _car = carList[_carIdentifier];
         require(_car.contractStep == 1, "Car is not locked");
         uint _fee = (now - _car.driveStartTime) * _car.pricePerBlock;
         ownerList[_car.owner].balance += _fee;
         renterList[_car.renter].balance -= _fee;
-        renterList[_car.renter].carIdentifier = "";
+        renterList[_car.renter].access = false;
+        renterList[_car.renter].accessToken = '';
         _car.renter = address(0);
         _car.contractStep = 0;                   //Owner deposit needs to be checked
         emit E_endRent(msg.sender, _carIdentifier, _fee);
@@ -195,12 +206,15 @@ contract MassCarSharing{
     //Withdraw Balance
     function withdrawBalance(bool _owner) public{
         if (_owner == true) {
+            require(ownerList[msg.sender].addr != address(0),'Owner not initialized');
             msg.sender.transfer(ownerList[msg.sender].balance);
         } else {
+            require(renterList[msg.sender].addr != address(0),'Renter not initialized');
             msg.sender.transfer(renterList[msg.sender].balance);
         }
     }
     
+    //Fund balance
     function fundBalance(bool _owner) public payable{
         if (_owner == true) {
             ownerList[msg.sender].balance += msg.value;
@@ -209,7 +223,7 @@ contract MassCarSharing{
         }
     }
     
-    function getCar(string memory _identifier) public view returns(car memory){
+    function getCar(address _identifier) public view returns(car memory){
         return carList[_identifier];
     }
     
