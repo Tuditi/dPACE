@@ -1,5 +1,5 @@
 pragma solidity ^0.6.4;
-pragma experimental ABIEncoderV2;
+pragma experimental ABIEncoderV2; // Delete this in end version -> only needed to return structs
 /* Author: David De Troch
 The goal of this contract is to implement the basic architecture for an
 aggregated car sharing application. This will be encrypted using zkay.
@@ -12,7 +12,6 @@ The state of the contract contains three entitities that can interact:
     Price,
     BalanceOwner,
     BalanceDriver,
-    ContractStep uint, --> used for secure programming
 }
 
 2. Owner{
@@ -41,26 +40,22 @@ contract MassCarSharing{
     mapping(address => bytes32) car_accessToken;    //private
     mapping(address => bytes32) car_location;
     mapping(address => bytes32) car_details;
-    mapping(address => address) car_owner;          //private
-    mapping(address => address) car_renter;         //private
-    mapping(address => bool)    car_available;
     mapping(address => uint)    car_price;
-    mapping(address => uint)    car_startTime;
+    mapping(address => uint)    car_endTime;
+    mapping(address => uint)    car_balance;
+    mapping(address => bool)    car_available;      //car is initialised
+    mapping(address => mapping(bytes32 => bool)) car_receipts;       //holds consumed payments
 
-    //Mappings to describe owner
-    mapping(address => string)  owner_name;
-    mapping(address => address) owner_car;          //private, because unlinkability needed between owner & car
-    mapping(address => uint)    owner_balance;      //private
+    mapping(address => address) owner_car;          //private
 
     //Mappings to describe renter
-    mapping(address => string)  renter_name;
     mapping(address => bytes32) renter_proof;       //ppim
-    mapping(address => bytes32) renter_accessToken;
+    mapping(address => bytes)   renter_accessToken;
     mapping(address => uint)    renter_balance;
     mapping(address => address) renter_car;         //private
-    mapping(address => bool)    renter_occupied;     //private
-    mapping(address => uint)    renter_start;
-    mapping(address => mapping(bytes32 => bool)) renter_receipts;
+    mapping(address => bool)    renter_occupied;
+    mapping(address => uint)    renter_startTime;
+    mapping(address => mapping(bytes32 => bool)) renter_receipts; //holds paid receipts
 
     //Variables
     address REGISTRATION_SERVICE = 0x1900A200412d6608BaD736db62Ba3352b1a661F2;//They are the ones who check whether the signature is valid
@@ -70,18 +65,8 @@ contract MassCarSharing{
     uint PENALTY_UNUSED = 1 ether; //Penalty if a certain time frame expires without the car being rent out
     uint TIME_PENALTY = 0.1 ether; //Penalty that motivates renter to use car as quickly as possible
     //Modifiers
-    modifier callerIsRenter(address _car){
-        require(msg.sender == car_renter[_car], 'This is not the car renter');
-        _;
-    }
-
     modifier callerIsOwner(address _car){
-        require(msg.sender == car_owner[_car], 'This is not the car owner');
-        _;
-    }
-
-    modifier involvedParties(address _car){
-        require((msg.sender == car_owner[_car]) || (msg.sender == car_renter[_car]) || (msg.sender == _car), 'Not part of the transaction');
+        require(_car == owner_car[msg.sender], 'This is not the car owner');
         _;
     }
 
@@ -101,10 +86,10 @@ contract MassCarSharing{
     }
 
     //Events
-    event E_deployedCar(address indexed _carOwner, address indexed _carAddress);
+    event E_deployedCar(address indexed _carOwner, address indexed _carAddress, bytes32 _accessToken);
     event E_registeredRenter(address indexed _carRenter, uint _renterBalance, bytes32 _proof);
-    event E_carRented(address indexed _carRenter, bytes32 indexed _accessToken);
-    event E_endRent(address indexed _identifier, uint _fee);
+    event E_carRented(address indexed _carRenter, bytes _accessToken);
+    event E_endRent(address indexed _identifier, uint _fee, bytes32 _newToken, bytes32 _newLocation);
 
     //1a. Create a car entry, when a new car is available for rent.
     function deployCar(
@@ -112,33 +97,28 @@ contract MassCarSharing{
         bytes32 _accessToken,
         bytes32 _location,
         bytes32 _details,
-        uint    _price,
-        string  memory _name
+        uint    _price
         )
         public
         checkDeposit()
         carUndeployed(_car)  //Otherwise already deployed car could be modified
         payable
     {
-    car_accessToken[_car] = _accessToken;
     car_location[_car] = _location;
     car_details[_car] = _details;
-    car_owner[_car] = msg.sender;
     car_available[_car] = true;
     car_price[_car] = _price;
-
-    owner_name[msg.sender] = _name;
+    car_balance[_car] = msg.value;
     owner_car[msg.sender] = _car;
-    owner_balance[msg.sender] = msg.value;
+
 
     deployedCars.push(_car);
-    emit E_deployedCar(msg.sender, owner_car[msg.sender]);
+    emit E_deployedCar(msg.sender, _car, _accessToken);
     }
 
     //1b. If a Renter has a signed proof that he is registered in the system and has put a deposit, he is entered inside the system.
     //Question: How should this proof look like to be a valid proof coupled to a specific user? Require proofIsValidFunction
     function enterRenter(
-        string memory _name,
         bytes32 _proof,
         uint8 _v,
         bytes32 _r,
@@ -151,7 +131,6 @@ contract MassCarSharing{
         // Signature checking needs to be moved to rentCar, since validity can change over time/ Do we need to store v,r,s?
         require(isSignatureValid(REGISTRATION_SERVICE, _proof, _v, _r, _s), 'No valid proof of registration');
 
-        renter_name[msg.sender] = _name;
         renter_proof[msg.sender] = _proof;
         renter_balance[msg.sender] = msg.value;
 
@@ -160,97 +139,62 @@ contract MassCarSharing{
 
     //2 Book a car based on identifier and the access token of the car encrypted with the public key.
     // This accessToken gets decrypted by the car hardware and checked for validity
-    function bookCar(address _car, bytes32 _encryptedAccessToken) public {
+    function bookCar(address _car, bytes memory _encryptedAccessToken) public {
         require(renter_balance[msg.sender] >= DEPOSIT,'Not enough balance, please fund account');
         require(!renter_occupied[msg.sender], 'Please return previous car');
 
         renter_car[msg.sender] = _car;
         renter_occupied[msg.sender] = true;
         renter_accessToken[msg.sender] = _encryptedAccessToken;
-        renter_start[msg.sender] = now; //will be used to punish renter in case he wasn't quick enough
+        renter_startTime[msg.sender] = now;  //will be used to calculate fee
 
         emit E_carRented(msg.sender, _encryptedAccessToken);
     }
 
-    //3 Whenever renter has booked a car, he can unlock the door by sending the car a key upon which the car unlocks itself after verifying on-chain that it is the correct renter
-    //3ed require: need for decoding accessToken, otherwise linkability (-> maybe offload checking this to local hw)
-    /* Can we make this virtual?
-    function startDriving(
-        address _renter,
-        bytes32 _decryptedAccessToken,
-        uint8   _v,
-        bytes32 _r,
-        bytes32 _s
-        ) public {
-        require(car_available[msg.sender], 'Car currently in use, pick other car!'); //also makes sure nonexistant cars can't be called
-        require(owner_balance[car_owner[msg.sender]] >= DEPOSIT,'Owner does not have enough balance, please fund account');
-        require(car_accessToken[msg.sender] == _decryptedAccessToken, 'Not the right token');
-        require(isSignatureValid(_renter, keccak256(abi.encodePacked(_decryptedAccessToken)), _v, _r, _s), 'Invalid signature from renter!');
-
-        car_renter[msg.sender] = _renter; 
-        car_available[msg.sender] = false;
-        car_startTime[msg.sender] = now;
-    }*/
-
-    //4 End drive, needs to be public, because it can be called by owner/renter
-    //
+    //3 end the driving which is called by the car. 2 problems: it can call with any renter plus signature and receive a fee
     function endDrivingNormal(
         address _renter,
-        bytes32 _location,
-        bytes32 _signedToken,
+        bytes32 _newLocation,
+        bytes32 _newToken,
         uint    _startTime,
         uint    _endTime,
-        uint8   _v1,
+        uint8   _v1, //Signatures need to be hidden
         uint8   _v2,
-        uint8   _v3,
         bytes32 _r1,
         bytes32 _r2,
-        bytes32 _r3,
         bytes32 _s1,
-        bytes32 _s2,
-        bytes32 _s3
+        bytes32 _s2
         ) public {
-        require(!car_available[msg.sender], "Car is not initialised");
-        require(isSignatureValid(
-            _renter,
-            keccak256(abi.encodePacked(_signedToken)),
-            _v1,
-            _r1,
-            _s1),
-            'Token doesnt have valid signature'
-            );
-
+        require(car_available[msg.sender], "Car is not initialised");
         require(isSignatureValid(
             _renter,
             keccak256(abi.encodePacked(_startTime)),
-            _v2,
-            _r2,
-            _s2),
-            'Invalid starting timestamp'
+            _v1,
+            _r1,
+            _s1),
+            'startTime doesnt have a valid signature'
             );
-
         require(isSignatureValid(
             _renter,
             keccak256(abi.encodePacked(_endTime)),
-            _v3,
-            _r3,
-            _s3),
-            'Invalid ending timestamp'
+            _v2,
+            _r2,
+            _s2),
+            'endTime doesnt have a valid signature'
             );
 
-        uint _fee = (_endTime - _startTime) * car_price[msg.sender];
-        owner_balance[car_owner[msg.sender]] += _fee;
 
-        car_renter[msg.sender] = address(0);                        //Do we need?
-        car_accessToken[msg.sender] = _signedToken;                //Owner deposit needs to be checked
-        car_location[msg.sender] = _location;
-        emit E_endRent(msg.sender, _fee);
+        uint _fee = (_endTime - _startTime) * car_price[msg.sender];
+
+        car_accessToken[msg.sender] = _newToken;                //Owner deposit needs to be checked
+
+        emit E_endRent(msg.sender, _fee, _newToken, _newLocation);
     }
 
-    //5 User calls this function to end his rental period.
-    // His fee is calculated based on a value found in an emitted event.
-    // In order to mitigate replay attacks (e.g. to use a previous car fee) a receipt(~nonce)
-    // is added to a private mapping
+    //4 User calls this function to end his rental period.
+    //  His fee is calculated based on a value found in an emitted event.
+    //  In order to mitigate replay attacks (e.g. to use a previous car fee) a receipt(~nonce)
+    //  is added to a private mapping
     function endRentalNormal(
         uint    _fee,
         uint8   _v,
@@ -261,7 +205,7 @@ contract MassCarSharing{
         bytes32 _receipt = keccak256(abi.encodePacked(_v,_r,_s));
         require(!renter_receipts[msg.sender][_receipt], 'Fee already paid');
         require(isSignatureValid(address(this), keccak256(abi.encodePacked(_fee)), _v, _r, _s), 'Fee wasnt signed off from car');
-        
+
         renter_receipts[msg.sender][_receipt] = true;
         renter_balance[msg.sender] -= _fee;
         renter_occupied[msg.sender] = false;
@@ -276,7 +220,7 @@ contract MassCarSharing{
 
     //Check balance of owner
     function getBalanceOwner() public view returns(uint) {
-        return owner_balance[msg.sender];
+        return car_balance[msg.sender];
     }
 
     //Check balance of renter
@@ -284,12 +228,11 @@ contract MassCarSharing{
         return renter_balance[msg.sender];
     }
 
-    //Withdraw Balance, check if this can't happen while driving!!
-    function withdrawBalanceOwner() public{
-        require(car_available[owner_car[msg.sender]], 'Car currently in use, wait until renter has returned car');
-        car_available[owner_car[msg.sender]] = false;
-        uint _value = owner_balance[msg.sender];
-        owner_balance[msg.sender] = 0;
+    //Withdraw Balance, minimum of 5 ether has to be deposited as long as car is available to drive
+    function withdrawBalanceCar(address _car) callerIsOwner(_car) public{
+        uint _value = car_balance[_car] - 5 ether;
+        require(_value > 0, 'Not enough balance');
+        car_balance[msg.sender] = 5 ether;
         msg.sender.transfer(_value);
     }
 
@@ -304,7 +247,7 @@ contract MassCarSharing{
     //Fund balance owner
     function fundBalanceOwner() public payable{
         require(owner_car[msg.sender] != address(0), 'Deploy car first');
-        owner_balance[msg.sender] += msg.value;
+        car_balance[owner_car[msg.sender]] += msg.value;
     }
 
     //Fund balance renter
@@ -317,55 +260,39 @@ contract MassCarSharing{
     //Structures used for testing
     struct car{
         address carHW;
-        address owner;
-        address renter;
-
         bytes32 accessToken;
         bytes32 details;
         bytes32 location;
 
         bool    available;
         uint    price;
-        uint    startTime;
-    }
-
-    struct owner{
-        address addr;
-        address car;
-        string  name;
-        uint    balance;
+        uint    endTime;
     }
 
     struct renter{
         address addr;
         address car;
         uint    balance;
+        uint    startTime;
         bytes32 proof;
-        string  name;    //How to encode this?
-        bool    driving;
+        bytes   accessToken;
+        bool    occupied;
     }
 
     function getCar(address _car) public view returns(car memory){
         return car(
             _car,
-            car_owner[_car],
-            car_renter[_car],
             car_accessToken[_car],
             car_details[_car],
             car_location[_car],
             car_available[_car],
             car_price[_car],
-            car_startTime[_car]
+            car_endTime[_car]
             );
     }
 
-    function getOwner(address  _owner) public view returns (owner memory){
-        return owner(
-            _owner,
-            owner_car[_owner],
-            owner_name[_owner],
-            owner_balance[_owner]
-        );
+    function getOwner(address  _car) public view returns (address){
+        return owner_car[_car];
     }
 
     function getRenter(address _renter) public view returns (renter memory){
@@ -373,8 +300,9 @@ contract MassCarSharing{
             _renter,
             renter_car[_renter],
             renter_balance[_renter],
+            renter_startTime[_renter],
             renter_proof[_renter],
-            renter_name[_renter],
+            renter_accessToken[_renter],
             renter_occupied[_renter]
             );
     }

@@ -26,7 +26,6 @@ const Audi_details = '0x274175646941352d6b6c617373652c2067656b6b6520776167676965
 
 beforeEach(async() => {
     accounts = await web3.eth.getAccounts();
-
     contract = await new web3.eth.Contract(abi)
         .deploy({data: evm.bytecode['object']})
         .send({ from: accounts[0], gas: MAX_GAS});
@@ -46,7 +45,7 @@ describe('Car Deployment', () => {
 
         const BMW = await contract.methods.getCar(BMW_address).call();
         const Rita = await contract.methods.getOwner(accounts[0]).call();
-
+        
         assert.equal(BMW.owner, accounts[0]);
         assert.equal(BMW.renter,'0x0000000000000000000000000000000000000000');
         assert.equal(BMW.carHW, BMW_address);
@@ -54,7 +53,7 @@ describe('Car Deployment', () => {
         assert.equal(BMW.location, BMW_location);
         assert.equal(BMW.available, true);
         assert.equal(BMW.price, 2);
-        assert.equal(BMW.startTime, 0);
+        assert.equal(BMW.endTime, 0);
 
         assert.equal(BMW.owner, Rita.addr);
         assert.equal(Rita.balance, web3.utils.toWei('5','ether'));
@@ -112,7 +111,7 @@ describe('Car Deployment', () => {
         assert.equal(Audi.location, Audi_location);
         assert.equal(Audi.available, true);
         assert.equal(Audi.price, 2);
-        assert.equal(Audi.startTime, 0);
+        assert.equal(Audi.endTime, 0);
 
         assert.equal(Audi.owner, Bernard.addr);
         assert.equal(Bernard.balance, web3.utils.toWei('10','ether'));

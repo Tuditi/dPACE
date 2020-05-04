@@ -1,239 +1,169 @@
 pragma solidity ^0.6.4;
-pragma experimental ABIEncoderV2;
 /* Author: David De Troch
-The goal of this contract is to implement the basic architecture for an
-aggregated car sharing application. This will be encrypted using zkay.
-The state of the contract contains three entitities that can interact:
-1. Car{
-    Available bool,
-    Owner address,
-    CurrentDriver address,
-    Details hash,
-    Price,
-    BalanceOwner,
-    BalanceDriver,
-    ContractStep uint, --> used for secure programming  
-}
+The goal of this contract is to implement the a tumbler that can be used for aggregated car sharing
+providing an application specifici payment hub. This payment hub is able to provide anonimity between
+car renter and driver.
+Contract consists of thre phases:
 
-2. Owner{
-    Address
-    Car
-    balance
-}
-
-3. Renter{
-    Address,
-    Car,
-    balance
-}
-Car HW contact
-{
-  address: '0x5ba7c96BB7707A83AFC2150BfFC81715c3090F04',
-  privateKey: '0x6bc48fee787b0809c3e8fe3fe854e9319ff2d50fbbe5f6d5f1dc3c2602d56ac4',
-  publicKey: '1fa124c4281fab15064cd5072f60bb6bd925aaa097b22d6fc6c61e019434349802f7898e3849f4ef6aaf8ce052cf6df8ca6ea6ff4072392f6726ae0e8db4760d'
-}
+Phase 1: Deploy car, renter and tumbler
+Phase 2: Booking and Payment of car
+Phase 3: Withdraw Balance
 */
 
-contract MassCarSharing{
-    //Structures stored inside MassCarSharing
-    struct car{
-        address owner;
-        address renter;
-        address carHW;
+contract carTumbler{
 
-        uint8   contractStep;
-        uint    pricePerBlock;
-        uint    driveStartTime;
+    address tumbler;
+    uint    tumblerBalance;
 
-        bytes32 accessToken;        //How to encode this?
-        string  location;
-        string  identifier;
-    }
+    //Renter
+    mapping(address => uint)    renter_balance;
+    mapping(address => bytes32) renter_hashLock;
+    mapping(address => uint)    renter_state;
+    mapping(address => uint)    renter_start;
+    mapping(address => bytes32) renter_fee;
+    mapping(address => mapping(uint => bool))    renter_invoices;
 
-    struct owner{
-        address addr;
-        uint    balance;
 
-        string  name;
-        string  carIdentifier;
-    }
+    //Car
+    mapping(address => uint)    car_balance;
+    mapping(address => bytes32) car_hashLock;
+    mapping(address => bool)    car_available;
+    mapping(address => uint)    car_state;
+    mapping(address => uint)    car_start;
+    mapping(address => bytes32) car_fee;
+    mapping(address => mapping(uint => bool))    car_invoices;
 
-    struct renter{
-        address addr;
-        uint    balance;
+    //Groupings of published fees
+    bytes32[] carFees;
+    bytes32[] renterFees;
 
-        bytes32 proof;
-        bytes32 accessToken;    //How to encode this?
-        bool    validated;
-        bool    access;
-    }
-
-    //Variables
-    address LocationContract;
-    address REGISTRATION_SERVICE = 0x1900A200412d6608BaD736db62Ba3352b1a661F2;//They are the ones who check whether the signature is valid
-    uint DEPOSIT = 5 ether;
-
-    mapping (address => car)    carList;    // private
-    mapping (address => owner)  ownerList;  // private
-    mapping (address => renter) renterList; // private
-
-    //Modifiers
-    modifier callerIsRenter(car storage _car){
-        require(msg.sender == _car.renter, 'This is not the car renter');
-        _;
-    }
-
-    modifier callerIsOwner(car storage _car){
-        require(msg.sender == _car.owner, 'This is not the car owner');
-        _;
-    }
-    
-    modifier involvedParties(car storage _car){
-        require((msg.sender == _car.owner) || (msg.sender == _car.renter) || (msg.sender == _car.carHW), 'Not part of the transaction');
-        _;
-    }
-
-    modifier carUndeployed(address _identifier){
-        require(carList[_identifier].owner == address(0),'Car already initialized');
-        _;
-    }
+    //Constants
+    uint DEPOSIT    = 5 ether;
+    uint PERIOD     = 300;
 
     //Events
-    event E_deployedCar(address indexed _carOwner, address indexed _carAddress, uint _ownerBalance);
-    event E_registeredRenter(address indexed _carRenter, uint _renterBalance, bytes32 _proof);
-    event E_carRented(address indexed _carOwner, address indexed _carRenter, address _carAddress, bytes32 indexed _accessToken);
-    event E_endRent(address indexed _endingParty, address indexed _identifier, uint _fee);
+    event E_deployRenter(address indexed _address);
+    event E_deployCar(address indexed _address, bytes32 indexed _token);
+    event E_carBooking(address indexed, bytes32 _hashLock);
+    event E_renterBooking(address indexed, bytes32 _hashLock, bytes32 _secretLink);
+    event E_carEnd(address indexed, bytes32 _newLock, bytes32 _blindedFee);
+    event E_renterEnd(address indexed, bytes32 _newLock, bytes32 _blindedFee);
+    event E_carPaid(address indexed);
+    event E_renterPaid(address indexed);
 
-    //1a. Create a car entry, when a new car is available for rent.
-    function deployCar(
-        string memory _location,
-        string memory _ownerName,
-        string memory _carName,
-        address       _identifier,
-        bytes32       _accessToken,
-        uint          _pricePerHour
-        )
-        public
-        carUndeployed(_identifier)                                               //Otherwise already deployed car could be modified
-        payable
-    {
-    require(msg.value >= DEPOSIT,'Not enough deposit to deploy car');           //Initial deposit is needed for guarantees
-    carList[_identifier] = car(
-        msg.sender,             //Owner
-        address(0),             //Renter, initialized 0
-        _identifier,            //Car hardware address -> currently equal to RSP
-        0,                      //Initialize contract step --> secure programming best practice
-        _pricePerHour,
-        now,                    //driveStartTime, exact time not that important here
-        _accessToken,
-        _location,
-        _carName);
-
-    ownerList[msg.sender] = owner(
-        msg.sender, //owner
-        msg.value,  //balance
-        _ownerName, //name
-        _carName); //carIdentifier
-
-        emit E_deployedCar(msg.sender, _identifier, ownerList[msg.sender].balance);
-    }
-        
-    //1b. If a Renter has a signed proof that he is registered in the system and has put a deposit, he is entered inside the system.
-    //Question: How should this proof look like to be a valid proof coupled to a specific user? Require proofIsValidFunction
-    function enterRenter(bytes32 _proof, uint8 _v, bytes32 _r, bytes32 _s) public payable{
+    //Modifiers
+    modifier checkDeposit(){
         require(msg.value >= DEPOSIT,'Not enough deposit to enter system');
-        require(isSignatureValid(REGISTRATION_SERVICE, _proof, _v, _r, _s), 'No valid proof of registration');
-        require(renterList[msg.sender].validated == false, 'Renter already in the system'); 
-        renterList[msg.sender] = renter(
-            msg.sender,
-            msg.value,
-            _proof,
-            '',
-            true,
-            false
-            );
-        emit E_registeredRenter(msg.sender, msg.value, _proof);
+        _;
     }
-    
-    
-    //2 Book a car based on identifier
-    function rentCar(address _carIdentifier) public {
-        require(renterList[msg.sender].balance >= DEPOSIT,'Not enough balance, please fund account');
-        require(!renterList[msg.sender].access, 'Please return previous car');
-        require(carList[_carIdentifier].contractStep == 0, 'Car currently in use, pick other car!');
 
-        carList[_carIdentifier].renter = msg.sender;
-        carList[_carIdentifier].contractStep++;
-        carList[_carIdentifier].driveStartTime = now;
-        renterList[msg.sender].access = true;
-        emit E_carRented(carList[_carIdentifier].owner, carList[_carIdentifier].renter, _carIdentifier, carList[_carIdentifier].accessToken);
-        renterList[msg.sender].accessToken = carList[_carIdentifier].accessToken;
-
+    modifier carAvailable(){
+        require(car_state[msg.sender] == 0, 'car is unavailabl');
+        _;
     }
-    
-    
-    //3 End booking, needs to be public, because it can be called by owner/renter
-    function endRentCar(address _carIdentifier) public involvedParties(carList[_carIdentifier]) {
-        car storage _car = carList[_carIdentifier];
-        require(_car.contractStep == 1, "Car is not locked");
-        uint _fee = (now - _car.driveStartTime) * _car.pricePerBlock;
-        ownerList[_car.owner].balance += _fee;
-        renterList[_car.renter].balance -= _fee;
-        renterList[_car.renter].access = false;
-        renterList[_car.renter].accessToken = '';
-        _car.renter = address(0);
-        _car.contractStep = 0;                   //Owner deposit needs to be checked
-        emit E_endRent(msg.sender, _carIdentifier, _fee);
 
+    modifier renterAvailable(){
+        require(renter_state[msg.sender] == 0, 'renter is unavailable');
+        _;
     }
-    
-    
-    //Check whether registry service has signed off that a renter is allowed to drive the car
-    function isSignatureValid(address _address, bytes32 _proof, uint8 _v, bytes32 _r, bytes32 _s) private pure returns(bool) {
-        address _signer = ecrecover(_proof, _v, _r, _s);  //possible some manipulation needed to get proof in proper form...
+
+    modifier carBooked(){
+        require(car_state[msg.sender] == 1);
+        _;
+    }
+    modifier renterBooked(){
+        require(renter_state[msg.sender] == 1);
+        _;
+    }
+
+    modifier carEnded(){
+        require(car_state[msg.sender] == 2);
+        _;
+    }
+
+    modifier renterEnded(){
+        require(renter_state[msg.sender] == 2);
+        _;
+    }
+
+    constructor() public payable{
+        require(msg.value >= 50 ether, 'Not enough collateral');
+        tumbler = msg.sender;
+        tumblerBalance = msg.value;
+    }
+
+    //Phase 0: renter and car are deployed as entities on the blockchain
+    function deployRenter() public payable checkDeposit() {
+        renter_balance[msg.sender] = msg.value;
+        emit E_deployRenter(msg.sender);
+    }
+
+    function deployCar(address _address, bytes32 _token) public payable checkDeposit() {
+        car_balance[msg.sender] = msg.value;
+        emit E_deployCar(_address, _token);
+    }
+
+    //Phase 1: A booking is initiated
+    function renterBooking(bytes32 _hashLock, bytes32 _secretLink) public renterAvailable() {
+        require(renter_balance[msg.sender] >= DEPOSIT, 'not enough deposit to start booking');
+        renter_hashLock[msg.sender] = _hashLock;
+        renter_state[msg.sender]++;
+        renter_start[msg.sender] = now;
+        emit E_renterBooking(msg.sender, _hashLock, _secretLink);
+    }
+
+    function carBooking(bytes32 _hashLock) public carAvailable() {
+        require(car_balance[msg.sender] >= DEPOSIT, 'not enough deposit to start booking');
+        car_hashLock[msg.sender] = _hashLock;
+        car_state[msg.sender]++;
+        car_start[msg.sender] = now;
+        emit E_carBooking(msg.sender, _hashLock);
+    }
+
+    //Phase 2: After driving is finished they change their state on-chain
+    function renterEnd(bytes32 _preimage, bytes32 _newLock, bytes32 _blindedFee) public renterBooked() {
+        require(renter_hashLock[msg.sender] == keccak256(abi.encodePacked(_preimage)), 'Not the appropriate value to open lock');
+        require(_blindedFee > 0, 'invalid fee, check through range proof');
+        renter_hashLock[msg.sender] = _newLock;
+        renter_fee[msg.sender] = _blindedFee;
+        renterFees.push(_blindedFee);               //Issue here that it is appended at the end
+        emit E_renterEnd(msg.sender, _newLock, _blindedFee);
+    }
+
+    function carEnd(bytes32 _preimage, bytes32 _newLock, bytes32 _blindedFee) public carBooked() {
+        require(car_hashLock[msg.sender] == keccak256(abi.encodePacked(_preimage)), 'Not the appropriate value to open lock');
+        require(_blindedFee > 0, 'invalid fee, check through range proof');
+        car_hashLock[msg.sender] = _newLock;
+        car_fee[msg.sender] = _blindedFee;
+        carFees.push(_blindedFee);                  //Issue here that it is appended at the end
+        emit E_carEnd(msg.sender, _newLock, _blindedFee);
+    }
+
+    //Phase 3: Payment & reset state
+    function renterPayment(bytes32 _preimage, uint _fee, uint _random) public renterEnded() {
+        require(renter_fee[msg.sender] == keccak256(abi.encodePacked(_fee, _random)), 'not the valid blinder');
+        require(renter_hashLock[msg.sender] == keccak256(abi.encodePacked(_preimage)), 'Not the appropriate value to open lock');
+        renter_state[msg.sender] = 0;
+        renter_balance[msg.sender] -= _fee;
+    }
+
+    function carPayment(bytes32 _preimage, uint _fee, uint _random, bytes32 _newToken) public carEnded() {
+        require(car_fee[msg.sender] == keccak256(abi.encodePacked(_fee, _random)), 'not the valid blinder');
+        require(car_hashLock[msg.sender] == keccak256(abi.encodePacked(_preimage)), 'Not the appropriate value to open lock');
+        car_state[msg.sender] = 0;
+        car_balance[msg.sender] += _fee;
+        emit E_carPaid(msg.sender); 
+    }
+
+    //Dispute resolution dissolves privacy
+
+
+
+    //Check whether correct address has signed off a certain hashed value
+    function isSignatureValid(address _address, bytes32 _hash, uint8 _v, bytes32 _r, bytes32 _s) private pure returns(bool) {
+        address _signer = ecrecover(_hash, _v, _r, _s);
         return(_signer == _address);
     }
 
-    //Check balance of owner or renter
-    function checkBalance(bool _owner) public view returns(uint) {
-        if (_owner == true) {
-            return ownerList[msg.sender].balance;
-        } else {
-            return renterList[msg.sender].balance;
-        }
-    }
     
-    //Withdraw Balance
-    function withdrawBalance(bool _owner) public{
-        if (_owner == true) {
-            require(ownerList[msg.sender].addr != address(0),'Owner not initialized');
-            msg.sender.transfer(ownerList[msg.sender].balance);
-        } else {
-            require(renterList[msg.sender].addr != address(0),'Renter not initialized');
-            msg.sender.transfer(renterList[msg.sender].balance);
-        }
-    }
-    
-    //Fund balance
-    function fundBalance(bool _owner) public payable{
-        if (_owner == true) {
-            ownerList[msg.sender].balance += msg.value;
-        } else {
-            renterList[msg.sender].balance += msg.value;
-        }
-    }
-    
-    function getCar(address _identifier) public view returns(car memory){
-        return carList[_identifier];
-    }
-    
-    function getOwner(address  _owner) public view returns (owner memory){
-        return ownerList[_owner];
-    }
-    
-    function getRenter(address _renter) public view returns (renter memory){
-        return renterList[_renter];
-    }
-
-
 }

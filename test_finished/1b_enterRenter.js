@@ -1,6 +1,7 @@
 const assert = require('assert');
 const ganache = require('ganache-cli');
 const Web3 = require ('web3');
+require('events').EventEmitter.defaultMaxListeners = 100;
 // Initiate a new instance of web3 that uses ganache for local development.
 // Once in production, this needs to be changed to test network.
 const web3 = new Web3();
@@ -37,12 +38,6 @@ const {abi, evm} = require('../compile');
 const MAX_GAS = '6721975';
 
 let contract;     //Holds instance of our contract
-
-let location = 'Berendrecht';
-let identifier = '001';
-let ownerName = 'Rita';
-let accessToken = '0x0000';
-let pricePerBlock = 2;
 
 var proofOfRegistration = "Valid driver's license";
 
@@ -105,7 +100,7 @@ describe('Enter Renter', () => {
         assert.equal(renter.addr, user0Address);
         assert.equal(renter.balance, web3.utils.toWei('5','ether'));
         assert.equal(renter.proof, proofHash);
-        assert.equal(renter.driving, false);
+        assert.equal(renter.occupied, false);
         assert.equal(renter.car,'0x0000000000000000000000000000000000000000');
         assert.equal(renter.name,'David');   
     });
@@ -162,7 +157,7 @@ describe('Enter Renter', () => {
         assert.equal(renter.addr, user2.address);
         assert.equal(renter.balance, web3.utils.toWei('5','ether'));
         assert.equal(renter.proof, proofHash);
-        assert.equal(renter.driving, false);
+        assert.equal(renter.occupied, false);
         assert.equal(renter.car,'0x0000000000000000000000000000000000000000');
         assert.equal(renter.name,'Kristof');
     });
