@@ -212,12 +212,7 @@ contract MassCarSharing{
         renter_car[msg.sender] = address(0);
     }
 
-    //Check whether registry service has signed off that a renter is allowed to drive the car
-    function isSignatureValid(address _address, bytes32 _proof, uint8 _v, bytes32 _r, bytes32 _s) private pure returns(bool) {
-        address _signer = ecrecover(_proof, _v, _r, _s);
-        return(_signer == _address);
-    }
-
+    
     //Check balance of owner
     function getBalanceOwner() public view returns(uint) {
         return car_balance[msg.sender];

@@ -26,6 +26,7 @@ contract carTumbler{
 
     //Car
     mapping(address => uint)    car_balance;
+    mapping(address => uint)    car_price;
     mapping(address => bytes32) car_hashLock;
     mapping(address => bool)    car_available;
     mapping(address => uint)    car_state;
@@ -46,8 +47,8 @@ contract carTumbler{
     event E_deployCar(address indexed _address, bytes32 indexed _token);
     event E_carBooking(address indexed, bytes32 _hashLock);
     event E_renterBooking(address indexed, bytes32 _hashLock, bytes32 _secretLink);
-    event E_carEnd(address indexed, bytes32 _newLock, bytes32 _blindedFee);
-    event E_renterEnd(address indexed, bytes32 _newLock, bytes32 _blindedFee);
+    event E_carEnd(address indexed, bytes32 _newLock, uint _fee);
+    event E_renterEnd(address indexed, bytes32 _newLock, bytes32 _Fee);
     event E_carPaid(address indexed);
     event E_renterPaid(address indexed);
 
@@ -120,23 +121,22 @@ contract carTumbler{
         emit E_carBooking(msg.sender, _hashLock);
     }
 
-    //Phase 2: After driving is finished they change their state on-chain
-    function renterEnd(bytes32 _preimage, bytes32 _newLock, bytes32 _blindedFee) public renterBooked() {
+    //Phase 2: After driving is finished they change their state on-chain, car publishes fee on-chain
+    function renterEnd(bytes32 _preimage, bytes32 _newLock, uint _fee) public renterBooked() {
         require(renter_hashLock[msg.sender] == keccak256(abi.encodePacked(_preimage)), 'Not the appropriate value to open lock');
-        require(_blindedFee > 0, 'invalid fee, check through range proof');
+        require(_fee > 0, 'invalid fee, check through range proof');
         renter_hashLock[msg.sender] = _newLock;
-        renter_fee[msg.sender] = _blindedFee;
-        renterFees.push(_blindedFee);               //Issue here that it is appended at the end
+        renter_fee[msg.sender] = _fee;
+        renterFees.push(_fee);               //Issue here that it is appended at the end
         emit E_renterEnd(msg.sender, _newLock, _blindedFee);
     }
 
-    function carEnd(bytes32 _preimage, bytes32 _newLock, bytes32 _blindedFee) public carBooked() {
+    function carEnd(bytes32 _preimage, bytes32 _newLock) public carBooked() {
         require(car_hashLock[msg.sender] == keccak256(abi.encodePacked(_preimage)), 'Not the appropriate value to open lock');
-        require(_blindedFee > 0, 'invalid fee, check through range proof');
         car_hashLock[msg.sender] = _newLock;
-        car_fee[msg.sender] = _blindedFee;
-        carFees.push(_blindedFee);                  //Issue here that it is appended at the end
-        emit E_carEnd(msg.sender, _newLock, _blindedFee);
+        uint _fee = (now - car_start[msg.sender])*car_price[msg.sender];    //Fee calculation happens at car side
+        carFees.push(keccak256(abi.encodePacked(_fee)));                  //Issue here that it is appended at the end
+        emit E_carEnd(msg.sender, _newLock, _fee);
     }
 
     //Phase 3: Payment & reset state
