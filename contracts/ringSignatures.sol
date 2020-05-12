@@ -1,6 +1,7 @@
 /**
  *Submitted for verification at Etherscan.io on 2017-10-15
 */
+
 pragma solidity ^0.4.17;
 
 contract RingMixerV2 {
@@ -31,12 +32,6 @@ contract RingMixerV2 {
     uint256 constant public ECSignMask = 0x8000000000000000000000000000000000000000000000000000000000000000;
     uint256 constant public a = 0xc19139cb84c680a6e14116da060561765e05aa45a1c72a34f082305b61f3f52; // (p+1)/4
     
-    //Ring message - Standard interface for ring signatures
-    struct RingMessage {
-        address[] destination;
-        uint256[] value;
-    }
-   
     //Storage of Spent Key Images
     mapping (uint256 => bool) public KeyImageUsed;
     
@@ -48,43 +43,6 @@ contract RingMixerV2 {
     mapping (uint256 => bool) public lookup_pubkey_by_balance_populated;
     mapping (uint256 => uint256) public lookup_pubkey_by_balance_count;
     
-    //Transaction Functions
-    //Deposit Ether as RingMixer tokens to the specified RingMixer address
-    function Deposit(address destination)
-        public payable  returns (bool success)
-    {
-        //Address must have a zero balance (never used)
-        require(token_balance[destination] == 0);
-        
-        //Incoming Value must be non-zero
-        require(msg.value > 0);
-        
-        //Add tokens to balance corrosponding to the amount of Ether
-        token_balance[destination] = msg.value;
-        success = true;
-    }
-    
-    //Equally distribute Ether as RingMixer tokens to the specified RingMixer addresses
-    function DepositN(address[] destination)
-        payable public returns (bool success)
-    {
-        //Must have more than one address specified
-        require(destination.length > 0);
-        
-        //Incoming Value must be non-zero
-        require(msg.value > 0);
-            
-        uint256 value = msg.value / destination.length;
-        for (uint i = 0; i < destination.length; i++) {
-            //Address must have a zero balance (never used)
-            require(token_balance[destination[i]] == 0);
-            
-            //Add tokens to balance corrosponding to the amount of Ether
-            token_balance[destination[i]] = value;
-        }
-        
-        success = true;
-    }
     
     //=== RingVerifyN ===
     //Inputs:
@@ -99,63 +57,6 @@ contract RingMixerV2 {
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
     //Outputs:
     //  success (bool) - true/false indicating if signature is valid on message
-    function Withdraw(address[] destination, uint256[] value, uint256[] signature)
-        public returns (bool success) 
-    {
-        //Check Array Bounds
-        require(destination.length == value.length);
-        
-        //Check for new key Image
-        require(!KeyImageUsed[signature[0]]);
-        
-        //Get Ring Size
-        uint256 ring_size = (signature.length - 2) / 2;
-        
-        //Check Values of Addresses - Must Match
-        uint256 i;
-        address addr;
-        uint256 txValue;
-        uint256 temp;
-        for (i = 0; i < ring_size; i++) {
-            temp = signature[2+ring_size+i];
-            addr = GetAddress(temp);
-            
-            //On first i, fetch value
-            if (i == 0) {
-                txValue = token_balance[addr];
-            }
-            //Values must match first address
-            else {
-                require(txValue == token_balance[addr]);
-            }
-            
-            //Update Lookup By Balance Table for Convenient Mix-ins
-            if (!lookup_pubkey_by_balance_populated[temp]) {
-                lookup_pubkey_by_balance[txValue].push(temp);
-                lookup_pubkey_by_balance_populated[temp] = true;
-                lookup_pubkey_by_balance_count[txValue]++;
-            }
-        }
-        
-        //Verify that the value to be sent spends the exact amount
-        temp = 0;
-        for (i = 0; i < value.length; i++) {
-            if (value[i] > txValue) return false; //Check for crafty overflows
-            temp += value[i];
-        }
-        if (temp != txValue) return false;
-        
-        //Check Ring for Validity
-        success = RingVerify(RingMessage(destination, value), signature);
-        
-        //Pay out balance
-        if (success) {
-            KeyImageUsed[signature[0]] = true;
-            for (i = 0; i < destination.length; i++) {
-                destination[i].transfer(value[i]);
-            }
-        }
-    }
     
     //Address Functions - Convert compressed public key into RingMixer address
     function GetAddress(uint256 PubKey)
@@ -301,10 +202,10 @@ contract RingMixerV2 {
     }
     
     //=====Ring Signature Functions=====
-    function HashFunction(RingMessage message, uint256[2] left, uint256[2] right)
+    function HashFunction(string message, uint256[2] left, uint256[2] right)
         internal pure returns (uint256 h)
     {
-        return (uint256(keccak256(message.destination, message.value, left[0], left[1], right[0], right[1])) % N);
+        return (uint256(keccak256(message, left[0], left[1], right[0], right[1])) % N);
     }
     
     //Return H = alt_bn128 evaluated at keccak256(p)
@@ -329,7 +230,7 @@ contract RingMixerV2 {
         Ix = ecMul(Ix, xk);
     }
     
-    function RingStartingSegment(RingMessage message, uint256 alpha, uint256[2] P0)
+    function RingStartingSegment(string message, uint256 alpha, uint256[2] P0)
         internal constant returns (uint256 c0)
     {
         //Memory Registers
@@ -343,7 +244,7 @@ contract RingMixerV2 {
         c0 = HashFunction(message, left, right);
     }
     
-    function RingSegment(RingMessage message, uint256 c0, uint256 s0, uint256[2] P0, uint256[2] Ix)
+    function RingSegment(string message, uint256 c0, uint256 s0, uint256[2] P0, uint256[2] Ix)
         internal constant returns (uint256 c1)
     {
         //Memory Registers
@@ -382,7 +283,7 @@ contract RingMixerV2 {
     //  message (RingMessage) - to be signed by the ring signature
     //  data (uint256[2*N+2]) - required data to form the signature where N is the number of Public Keys (ring size)
     //      data[0] - index from 0 to (N-1) specifying which Public Key has a known private key
-    //      data[1] - corrosponding private key for PublicKey[k]
+    //      data[1] - corresponding private key for PublicKey[k]
     //      data[2   ... 2+(N-1)] - Random Numbers - total of N random numbers
     //      data[2+N ... 2*N+1  ] - Public Keys (compressed) - total of N Public Keys
     //      e.g. N=3; data = {k, PrivateKey_k, random0, random1, random2, PubKey0, PubKey1, PubKey2 }
@@ -395,7 +296,7 @@ contract RingMixerV2 {
     //      signature[2+N   ... 2*N+1  ] - Public Keys (compressed) - total of N Public Keys
     //      signature[2*N+2 ... 31     ] - Padding (0)
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
-    function RingSign(RingMessage message, uint256[] data)
+    function RingSign(string message, uint256[] data)
         internal constant returns (uint256[32] signature)
     {
         //Check Array Lengths
@@ -450,10 +351,10 @@ contract RingMixerV2 {
         signature[2+data[0]] = SubMul(data[2+data[0]], c, data[1]);
     }
     
-    function RingSign_User(address[] destination, uint256[] value, uint256[] data)
+    function RingSign_User(string message, uint256[] data)
         public constant returns (uint256[32] signature)
     {
-        return RingSign(RingMessage(destination, value), data);
+        return RingSign(message, data);
     }
     
     //=== RingVerifyN ===
@@ -468,7 +369,7 @@ contract RingMixerV2 {
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
     //Outputs:
     //  success (bool) - true/false indicating if signature is valid on message
-    function RingVerify(RingMessage message, uint256[] signature)
+    function RingVerify(string message, uint256[] signature)
         internal constant returns (bool success)
     {
         //Check Array Lengths
@@ -498,9 +399,9 @@ contract RingMixerV2 {
         success = (c == signature[1]);
     }
     
-    function RingVerify_User(address[] destination, uint256[] value, uint256[] signature)
+    function RingVerify_User(string message, uint256[] signature)
         public constant returns (bool success)
     {
-        return RingVerify(RingMessage(destination, value), signature);
+        return RingVerify(message, signature);
     }
 }
