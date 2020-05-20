@@ -1,0 +1,16 @@
+pragma solidity ^0.6.4;
+
+contract updateBalance{
+    mapping(address!x => uint@x)    renter_balance;
+
+    function deployRenter(uint@me _balance) public {
+        require(reveal(_balance == msg.value,all));
+        renter_balance[me] = _balance;
+    }
+
+    function updateBalance(uint@me _fee) public returns(bool){
+        require(reveal(_fee > 0 , all));
+        uint@me _previousBalance = renter_balance[me];
+        renter_balance[me] = _previousBalance - _fee;
+    }
+}

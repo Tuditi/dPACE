@@ -12,20 +12,21 @@ Phase 3: Withdraw Balance
 
 contract carSharing{
 
-    //Renter
+    //Renter Mappings
     mapping(address => uint)    renter_balance;
-    mapping(address => bytes32) renter_hashLock;
     mapping(address => uint)    renter_state;
     mapping(address => uint)    renter_start;
+    mapping(address => bytes32) renter_hashLock;
     mapping(address => bytes32) renter_fee;
-    mapping(address => mapping(uint => bool))    renter_invoices;
+    mapping(address => bytes32) renter_ppc;
+    mapping(address => bool)    renter_validated;
 
 
-    //Car
+    //Car Mappings
     mapping(address => uint)    car_balance;
     mapping(address => uint)    car_price;
     mapping(address => bytes32) car_hashLock;
-    mapping(address => bool)    car_available;
+    mapping(address => bytes32) car_token;
     mapping(address => uint)    car_state;
     mapping(address => uint)    car_start;
     mapping(address => bytes32) car_fee;
@@ -37,11 +38,13 @@ contract carSharing{
 
     //Constants
     uint DEPOSIT    = 5 ether;
-    uint PERIOD     = 300;
+    uint PERIOD     = 86400;
+    address REGISTRATION_SERVICE = address(0);
 
     //Events
-    event E_deployRenter(address indexed _address);
-    event E_deployCar(address indexed _address, bytes32 indexed _token);
+    event E_deployRenter(address indexed _address, bytes32 _ppc);
+    event E_deployCar(address indexed _address, bytes32 _details);
+    event E_carAvailable(address indexed _address, bytes32 indexed _token, bytes32 _location, uint _price);
     event E_carBooking(address indexed, bytes32 _hashLock);
     event E_renterBooking(address indexed, bytes32 _hashLock, bytes32 _secretLink);
     event E_carEnd(address indexed, bytes32 _newLock, uint _fee);
@@ -56,7 +59,7 @@ contract carSharing{
     }
 
     modifier carAvailable(){
-        require(car_state[msg.sender] == 0, 'car is unavailabl');
+        require(car_state[msg.sender] == 0, 'car is unavailable');
         _;
     }
 
@@ -85,14 +88,25 @@ contract carSharing{
     }
 
     //Phase 0: renter and car are deployed as entities on the blockchain
-    function deployRenter() public payable checkDeposit() {
+    function deployRenter(bytes32 _ppc, uint8 _v, bytes32 _r, bytes32 _s) public payable checkDeposit() {
+        require(isSignatureValid(REGISTRATION_SERVICE, _ppc, _v, _r, _s), "No valid PPC_renter");
         renter_balance[msg.sender] = msg.value;
-        emit E_deployRenter(msg.sender);
+        renter_ppc[msg.sender] = _ppc;
+        emit E_deployRenter(msg.sender, _ppc);
     }
 
-    function deployCar(address _address, bytes32 _token) public payable checkDeposit() {
-        car_balance[msg.sender] = msg.value;
-        emit E_deployCar(_address, _token);
+    function deployCar(address _address, bytes32 _details, uint _price) public payable checkDeposit() {
+        car_balance[_address] = msg.value;
+        car_owner[_address] = msg.sender;
+        car_price[_address] = _price;
+        emit E_deployCar(_address, _details);
+    }
+    
+    function validateCar(bytes32 _token, bytes32 _location) public {
+        require(car_owner[msg.sender] != address(0),'Car not yet deployed');
+        require(car_state[msg.sender] == 0, 'Car not yet validated');
+        car_state[msg.sender] = 1;
+        emit E_carAvailable(msg.sender, _token, _location, car_price[msg.sender]);
     }
 
     //Phase 1: A booking is initiated
@@ -153,7 +167,7 @@ contract carSharing{
     function isSignatureValid(address _address, bytes32 _hash, uint8 _v, bytes32 _r, bytes32 _s) private pure returns(bool) {
         address _signer = ecrecover(_hash, _v, _r, _s);
         return(_signer == _address);
-    }   
+    }
 }
 
 contract verifyRingSignature{
