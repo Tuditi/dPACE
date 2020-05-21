@@ -8,7 +8,7 @@ const solc = require('solc');
 
 // the path to MassCarSharing.sol, __dirname is a constant defined by node and
 // will always return the valid current working directory
-const massCarSharingPath = path.resolve(__dirname, 'contracts', 'Signature.sol');
+const massCarSharingPath = path.resolve(__dirname, 'contracts', 'massCarSharing.sol');
 // This reads the contents of the file using the filesystem (fs) module
 const source = fs.readFileSync(massCarSharingPath, 'UTF-8');
 
@@ -23,10 +23,11 @@ const compiledContract = solc.compile(JSON.stringify({
    },settings: {
       outputSelection: {
          "*": {
-            "Signature": ["abi", "evm.bytecode.object"] //carSharing needs to be the same name as the contract!!
+            "carSharing": ["abi", "evm.bytecode.object"] //carSharing needs to be the same name as the contract!!
          }
       }
       }
    })
 ); 
-module.exports = JSON.parse(compiledContract).contracts[':massCarSharing'].Signature;
+console.log(compiledContract);
+module.exports = JSON.parse(compiledContract).contracts[':massCarSharing'].carSharing;

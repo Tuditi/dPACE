@@ -1,10 +1,9 @@
 pragma solidity ^0.6.4;
 
-contract ringSignature {
+contract Signature {
 
-     //alt_bn128 constants
-    uint256[2] public G1 = [1,2];
-    uint256[2] public H = HashPoint(G1);
+     //alt_bn128 constants     
+    uint256[2] public G1;
     uint256 constant public N = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
     uint256 constant public P = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
 
@@ -50,7 +49,7 @@ contract ringSignature {
 
             //Call ECAdd: call contract at address a with input mem[in..(in+insize)) providing g gas and v wei and output area mem[out..(out+outsize))
             //returning 0 on error (eg. out of gas) and 1 on success
-            let success := call(500, 0x06, 0, p, 0x80, p, 0x40)
+            let success := call(sub(gas(),2000), 0x06, 0, p, 0x80, p, 0x40)
 
             // Use "invalid" to make gas estimation work
  			switch success case 0 { revert(p, 0x80) }
@@ -74,7 +73,7 @@ contract ringSignature {
             mstore(add(p, 0x40), s)
 
             //Call ECAdd
-            let success := call(500, 0x07, 0, p, 0x60, p, 0x40)
+            let success := call(sub(gas(),2000), 0x07, 0, p, 0x60, p, 0x40)
 
             // Use "invalid" to make gas estimation work
  			switch success case 0 { revert(p, 0x80) }
@@ -86,7 +85,7 @@ contract ringSignature {
     }
 
     function CompressPoint(uint256[2] memory Pin)
-        internal pure returns (uint256 Pout)
+        public returns (uint256 Pout)
     {
         //Store x value
         Pout = Pin[0];
@@ -120,7 +119,7 @@ contract ringSignature {
             mstore(add(p, 0xA0), p_local)   //Modulus
 
             //Call Big Int Mod Exp
-            let success := call(2000, 0x05, 0, p, 0xC0, p, 0x20)
+            let success := call(sub(gas(),2000), 0x05, 0, p, 0xC0, p, 0x20)
 
             // Use "invalid" to make gas estimation work
  			switch success case 0 { revert(p, 0xC0) }
@@ -240,7 +239,7 @@ contract ringSignature {
     }
     //SubMul = (u - c*xk) % N
     function SubMul(uint256 u, uint256 c, uint256 xk, uint256 nonce)
-        internal pure returns (uint256 s)
+        internal returns (uint256 s)
     {
         s = mulmod(c, xk, N);
         s = mulmod(c, nonce, N);

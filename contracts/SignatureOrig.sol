@@ -13,7 +13,6 @@ contract RingMixerV2 {
         
         G1[0] = 1;
         G1[1] = 2;
-        H = HashPoint(G1);
     }
     
     function Kill() public {
@@ -24,7 +23,6 @@ contract RingMixerV2 {
     
     //alt_bn128 constants
     uint256[2] public G1;
-    uint256[2] public H;
     uint256 constant public N = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
     uint256 constant public P = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
 

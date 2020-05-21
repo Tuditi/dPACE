@@ -36,7 +36,7 @@ describe('Car Deployment', () => {
         assert.ok(contract.options.address);
     });
 
-    it('deploy car 1', async() => {
+    /*it('deploy car 1', async() => {
         await contract.methods.deployCar(BMW_address,BMW_accessToken,BMW_location,BMW_details,2,'Rita').send({
             from: accounts[0],
             value: web3.utils.toWei('5','ether'),
@@ -116,5 +116,5 @@ describe('Car Deployment', () => {
         assert.equal(Audi.owner, Bernard.addr);
         assert.equal(Bernard.balance, web3.utils.toWei('10','ether'));
         assert.equal(Bernard.name,'Bernard');
-    });
+    });*/
 });
