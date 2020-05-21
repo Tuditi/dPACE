@@ -3,7 +3,7 @@ pragma solidity ^0.6.4;
 contract Signature {
 
      //alt_bn128 constants     
-    uint256[2] public G1;
+    uint256[2] public G1 = [1,2];
     uint256 constant public N = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
     uint256 constant public P = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
 
@@ -97,7 +97,7 @@ contract Signature {
     }
 
     function EvaluateCurve(uint256 x)
-        internal returns (uint256 y, bool onCurve)
+        public returns (uint256 y, bool onCurve)
     {
         uint256 y_squared = mulmod(x,x, P);
         y_squared = mulmod(y_squared, x, P);
@@ -117,7 +117,6 @@ contract Signature {
             mstore(add(p, 0x60), y_squared) //Base
             mstore(add(p, 0x80), a_local)   //Exponent
             mstore(add(p, 0xA0), p_local)   //Modulus
-
             //Call Big Int Mod Exp
             let success := call(sub(gas(),2000), 0x05, 0, p, 0xC0, p, 0x20)
 
@@ -189,13 +188,12 @@ contract Signature {
         h[0]--;
     }
 
-    function KeyImage(uint256 xk, uint256 nonce, uint256[2] memory Pk)
+    function KeyImage(uint256 xk, uint256[2] memory Pk)
         internal returns (uint256[2] memory Ix)
     {
         //Ix = xk * HashPoint(Pk)
         Ix = HashPoint(Pk);
         Ix = ecMul(Ix, xk);
-        Ix = ecMul(Ix, nonce);
     }
 
     function RingStartingSegment(string memory message, uint256 alpha, uint256[2] memory P0)
@@ -212,7 +210,7 @@ contract Signature {
         c0 = HashFunction(message, left, right);
     }
     //c0 needs to be c0*nonce
-    function RingSegment(string memory message, uint256 nonce, uint256 c0, uint256 s0, uint256[2] memory P0, uint256[2] memory Ix)
+    function RingSegment(string memory message, uint256 c0, uint256 s0, uint256[2] memory P0, uint256[2] memory Ix)
         internal returns (uint256 c1)
     {
         //Memory Registers
@@ -226,7 +224,6 @@ contract Signature {
 
         //Calculate left = c*nonce*P0 + s0*G1)
         left = ecMul(left, c0);
-        left = ecMul(left, nonce);
         temp = ecMul(G1, s0);
         left = ecAdd(left, temp);
 
@@ -238,11 +235,10 @@ contract Signature {
         c1 = HashFunction(message, left, right);
     }
     //SubMul = (u - c*xk) % N
-    function SubMul(uint256 u, uint256 c, uint256 xk, uint256 nonce)
+    function SubMul(uint256 u, uint256 c, uint256 xk)
         internal returns (uint256 s)
     {
         s = mulmod(c, xk, N);
-        s = mulmod(c, nonce, N);
         s = N - s;
         s = addmod(u, s, N);
     }
@@ -265,7 +261,7 @@ contract Signature {
     //      signature[2+N   ... 2*N+1  ] - Public Keys (compressed) - total of N Public Keys
     //      signature[2*N+2 ... 31     ] - Padding (0)
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
-    function RingSign(string memory message, uint256 nonce, uint256[] memory data)
+    function RingSign(string memory message, uint256[] memory data)
         public returns (uint256[32] memory signature)
     {
         //Check Array Lengths
@@ -290,7 +286,7 @@ contract Signature {
 
         //Calculate Key Image
         pubkey = ExpandPoint(data[2+ring_size+data[0]]);
-        keyimage = KeyImage(data[1], nonce,  pubkey);
+        keyimage = KeyImage(data[1],  pubkey);
         signature[0] = CompressPoint(keyimage);
 
         //Calculate Starting c = hash( message, u*G1, u*HashPoint(Pk) )
@@ -303,7 +299,7 @@ contract Signature {
             //Deserialize Point and calculate next Ring Segment
             pubkey = ExpandPoint(data[2+ring_size+i]);
 
-            c = RingSegment(message, nonce, c, data[2+i], pubkey, keyimage);
+            c = RingSegment(message, c, data[2+i], pubkey, keyimage);
 
             //Increment Counters
             i = i + 1;
@@ -316,7 +312,7 @@ contract Signature {
         }
         //Calculate s s.t. alpha*G1 = c1*P1 + s1*G1 = (c1*x1 + s1) * G1
         //s = alpha - c1*x1*nonce
-        signature[2+data[0]] = SubMul(data[2+data[0]], c, data[1], nonce);
+        signature[2+data[0]] = SubMul(data[2+data[0]], c, data[1]);
     }
 
     //=== RingVerify ===
@@ -331,7 +327,7 @@ contract Signature {
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
     //Outputs:
     //  success (bool) - true/false indicating if signature is valid on message
-    function RingVerify(string memory message, uint256 nonce, uint256[] memory signature)
+    function RingVerify(string memory message, uint256[] memory signature)
         public returns (bool success)
     {
         //Check Array Lengths
@@ -355,7 +351,7 @@ contract Signature {
         for (; i < ring_size;) {
             //Deserialize Point and calculate next Ring Segment
             pubkey = ExpandPoint(signature[2+ring_size+i]);
-            c = RingSegment(message, nonce, c, signature[2+i], pubkey, keyimage);
+            c = RingSegment(message, c, signature[2+i], pubkey, keyimage);
 
             //Increment Counters
             i = i + 1;
