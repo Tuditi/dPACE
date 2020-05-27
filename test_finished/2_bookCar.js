@@ -6,6 +6,7 @@ const Web3 = require ('web3');
 const EthCrypto = require('eth-crypto');
 const ecies = require('eth-ecies');
 require('events').EventEmitter.defaultMaxListeners = 100;
+const Prng = require('../ownSignature/lib/prng');
 
 const web3 = new Web3(ganache.provider());
 const {abi, evm} = require('../compile');
@@ -25,6 +26,11 @@ const publicKeyRSP = '86b41d0c97dd302e7df473f243766ef803afabd2c93ddc9f670e059494
 const privateKeyRSP = 'ff6415f9fd0b8d9b3712843c53048b27a51171ce713517f42f4820e74310f614';
 
 //Addresses cars:
+//Variables to initiate Mercedes
+
+const Merc_address = '0x2a63100f352FC1005Ccd80aFe8eB5F3E5BDFbf3d';
+const Merc_privateKey = '0xe8c4ee72dec852d020f3f04a593b12c6f2dd2421bfde6e025956c59840c79650';
+const Merc_publicKey = 'b325d889d122fb4a3ed05d217df5d44444ad699226df7e46b317c65bfeaf346b4d2ae9da143ea1e880080e247e563a8969c8e0f111b655d5ede50b74060749da';
 
 //Variables to initiate BMW
 const BMW_address = '0x5ba7c96BB7707A83AFC2150BfFC81715c3090F04';
@@ -56,6 +62,81 @@ function decrypt(privateKey, encryptedData) {
     let decryptedData = ecies.decrypt(userPrivateKey, bufferEncryptedData);
     return decryptedData.toString('utf8');
 }
+
+// Not Tested, uses eth-crypto for both signing and encrypting --> maybe eth-ecies is better
+
+async function initiateBooking(user, car, index, publicKeys) {
+    const link = EthCrypto.sign(
+        user.privateKey,
+        EthCrypto.hash.keccak256(car.accessToken));
+
+    const sLink = await EthCrypto.encryptWithPublicKey(
+        car.publicKey,
+        link);
+
+    const hashLock = generateHashLock();
+    const rSignature = await ringSign(hashLock, user, index, publicKeys);
+    
+    return {
+        lock:           hashLock,
+        secretLink:     sLink,
+        ringSignature:  rSignature,
+    };
+}
+
+async function checkBooking(hashLock, link, ringSignature, car, renter, index, publicKeys){
+    const signatureAT = await EthCrypto.decryptWithPrivateKey(car.privateKey,encryptedAT);
+    
+    if(renter.address != EthCrypto.recover(
+        signatureAT,
+        EthCrypto.hash.keccak256(car.accessToken)
+    )){
+        throw "Invalid Signature!";
+    };
+
+    const valid = await contract.methods.ringVerify(hashLock, ringSignature).call({
+        from: car.address,
+        gas: MAX_GAS
+    })
+
+    if (!valid){
+        throw "Invalid Ring Signature!";
+    }
+
+    const hashLock = generateHashLock();
+    const rSignature = await ringSign(hashLock, car, index, publicKeys);
+    
+    return {
+        lock:           hashLock,
+        ringSignature:  rSignature,
+    };
+}
+
+function generateHashLock(){
+    const prn = new Prng().random;
+    return {
+        preimage: prn,
+        hashLock: web3.utils.soliditySha3(prn)
+    };    
+};
+
+async function ringSign(msg, user,  index, publicKeys){
+    publicKeys.slice(index, user.publicKey);
+
+    const randomNumbers = new Array();
+    for (let i = 0; i < publicKeys.length; i++){
+        randomNumbers.push(new Prng().random);
+    };
+    
+    const data = [index, user.privateKey].concat(
+        randomNumbers.concat(publicKeys));
+
+    const signature = await contract.methods.RingSign(msg,data).call({
+        from: user.address,
+        gas: MAX_GAS
+    });
+    return signature;
+};
 
 beforeEach(async() => {
     const ganacheProvider = ganache.provider({

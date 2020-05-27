@@ -29,4 +29,5 @@ const compiledContract = solc.compile(JSON.stringify({
       }
    })
 ); 
+
 module.exports = JSON.parse(compiledContract).contracts[':massCarSharing'].Signature;

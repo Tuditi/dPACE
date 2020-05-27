@@ -5,6 +5,7 @@ require('events').EventEmitter.defaultMaxListeners = 100;
 // Initiate a new instance of web3 that uses ganache for local development.
 // Once in production, this needs to be changed to test network.
 const web3 = new Web3();
+const Prng = require('../ownSignature/lib/prng');
 
 //Need for validating signature
 const EthCrypto = require('eth-crypto');
@@ -175,8 +176,84 @@ describe("End driving by the car:", () =>{
         const decryptedSig = decrypt(BMW_privateKey.slice(2),renter.accessToken);
 
     })
-
-
-
-    
 })
+//Untested functions needed for the thesis!
+async function carFinish(car, renter, start, index, publicKeys) {
+    //Fee calculation
+    const timestamp = getTime();
+    const fee = car.price * (timestamp - start);
+    //Blind fee according in the same way as ZoKrates: HOW TO DO THIS???
+    const r = new Prng().random;
+    const blindedFee = await EthCrypto.encryptWithPublicKey(
+        renter.publicKey,
+        fee.concat(r)
+    );
+    //Generate signatures
+    const rSignature = await ringSign(blindedFee, car, index, publicKeys);
+    const signedTime = EthCrypto.sign(
+        car.privateKey,
+        EthCrypto.hash.keccak256(timestamp)
+    );
+    return {
+        blindedFee: blindedFee,
+        randomness: r,
+        timestamp:  timestamp,
+        signature:  signedTime,
+        rSignature: rSignature
+    };
+}
+
+async function renterFinish(message, renter, car, index, publicKeys){
+    //Check correctness fee
+    const decryptedPayload = await EthCrypto.decryptWithPrivateKey(
+        renter.privateKey,
+        message.blindedFee
+    );
+    const unblindedFee = decryptedPayload.slice(0,unblindedFee-message.r.length);
+    if (unblindedFee != (message.timestamp-car.start)*car.price){
+        throw "Incorrect fee";
+    };
+    //Check signatures
+    if (car.address != EthCrypto.recover(
+        message.signature,
+        EthCrypto.hash.keccak256(message.timestamp)
+    )){
+        throw "Invalid Signature!";
+    };
+    const valid = await contract.methods.ringVerify(hashLock, ringSignature).call({
+        from: renter.address,
+        gas: MAX_GAS
+    })
+    if (!valid){
+        throw "Invalid Ring Signature!";
+    }
+    //Generate ring signature
+    const rSignature = await ringSign(message.signature, renter, index, publicKeys);
+    return rSignature;
+}
+
+function generateHashLock(){
+    const prn = new Prng().random;
+    return {
+        preimage: prn,
+        hashLock: web3.utils.soliditySha3(prn)
+    };    
+}
+
+async function ringSign(msg, user,  index, publicKeys){
+    publicKeys.slice(index, user.publicKey);
+
+    const randomNumbers = new Array();
+    for (let i = 0; i < publicKeys.length; i++){
+        randomNumbers.push(new Prng().random);
+    };
+    
+    const data = [index, user.privateKey].concat(
+        randomNumbers.concat(publicKeys));
+
+    const signature = await contract.methods.RingSign(msg,data).call({
+        from: user.address,
+        gas: MAX_GAS
+    });
+    return signature;
+};

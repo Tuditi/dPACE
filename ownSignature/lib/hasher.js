@@ -9,6 +9,9 @@ class Hasher{
         this.ec = new EcDSA.ec("bn256");
     }
 
+    get curve(){
+        return this.ec.curve;
+    }
     //correct values
     get G(){
         return this.ec.g;
@@ -27,11 +30,36 @@ class Hasher{
 
         return msgHash;
     }
-    ///Function doesn't work, because the has needs to be the x coordinate and then we need to find the corresponding y-coordinate.
+    //Function that hashes the x-coodinate and calculates the corresponding y-coordinate
     hash_point(point){
-        let pointArr = [point.x,point.y];
-        let moduloHash = web3.utils.toBN(this.hash_array(pointArr)); //Check whether this modulo has to be here?
-        return this.G.mul(moduloHash);
+        console.log("Y-value of point(JS):")
+        let hash = web3.utils.toBN(web3.utils.soliditySha3(point.x));
+        let mod_hash = hash.mod(this.l);
+        let on_curve = false;
+        while(!on_curve){
+            try{
+                point = this.ec.curve.pointFromX(mod_hash,true);
+                on_curve = true;
+            } catch(err) {
+                mod_hash = mod_hash.add(web3.utils.toBN(1,16));
+            }
+        }
+        return point;
+    }
+
+    evaluate_curve(x){
+        let point;
+        let on_curve;
+        try{
+            point = this.ec.curve.pointFromX(x,false);
+            on_curve = true;
+        } catch(err) {
+            point = 0;
+            on_curve = false;
+        }
+        
+        return point;
+
     }
 
     hash_array(array){
