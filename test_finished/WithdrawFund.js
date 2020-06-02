@@ -141,7 +141,7 @@ beforeEach(async() => {
     })
 });
 
-describe('Check Withdrawal and Funding', () => {
+describe('Check Withdrawal and Funding', async() => {
     it('withdraw balance owner that has 10 ether', async() =>{
         const balanceBefore = await web3.eth.getBalance(accounts[0]);
         console.log('Amount of Ether inside account0 after deploying car:', balanceBefore);
