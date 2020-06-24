@@ -47,11 +47,29 @@ const token = web3.utils.soliditySha3(Math.floor((Math.random() * 10) + 1));
 const location = "Pentagon";
 
 //Define Interacting Parties
-const car = gen_accounts[9];
-const renter = gen_accounts[1];
+const car ={
+    address: '0xe53a6d5Fb497ea9E76717c5374ee824431E620CE',
+    privateKey: '0x2388efffdaa080229fce49759d0557c05778c962a1bef0b6fb613c6d7d05f340'
+}
+
+const renter = {
+    address: '0xce95f5FF6f7c1a341b021D764A9d461698a1629c',
+    privateKey: '0xbcb91c915128726d1339aeb5607df7d134108c5c6206f212a30a2d11d50b097e'
+}
+
+ganacheAccounts.push({
+    secretKey: car.privateKey,
+    balance: web3.utils.toWei('100', 'ether')
+});
+
+ganacheAccounts.push({
+    secretKey: renter.privateKey,
+    balance: web3.utils.toWei('100', 'ether')
+});
+
 // Car & Renter generate hashlocks during offline communication
-const hashlockRenter = generateHashlock(renter.address,car);
-const hashlockCar = generateHashlock(car.address,renter);
+const hashlockRenter = generateHashlock(renter.address, car);
+const hashlockCar = generateHashlock(car.address, renter);
 
 beforeEach(async() => {
     web3.setProvider(ganache.provider({
@@ -65,27 +83,41 @@ beforeEach(async() => {
     contract.events.E_carAvailable({},
         function(error, event){
             carAvailable = event.returnValues;
+            console.log("Car Available", carAvailable);
         }
     );
-
+    console.log("DEPLOY RENTER:");
+    console.log("ppc:", ppc);
+    console.log("vrs:", vrs);
     await contract.methods.deployRenter(ppc, vrs.r, vrs.s, vrs.v).send({
-        from: accounts[1],
+        from: accounts[11],
         value: web3.utils.toWei('20','ether'),
         gas: MAX_GAS
     });
 
-    await contract.methods.deployCar(accounts[9], details, web3.utils.toWei('0.000011574','ether')).send({
+    console.log("DEPLOY RENTER:");
+    console.log("details:", details);
+    console.log("price:", web3.utils.toWei('0.000011574','ether'));
+
+    await contract.methods.deployCar(accounts[10], details, web3.utils.toWei('0.000011574','ether')).send({
         from: accounts[2],
         value: web3.utils.toWei('6','ether'),
         gas: MAX_GAS
     });
 
+    console.log("VALIDATE CAR:");
+    console.log("token:", token);
+
     await contract.methods.validateCar(token, location).send({
-        from: accounts[9],
+        from: accounts[10],
         gas: MAX_GAS
     });
 
     const secretLink = web3.utils.soliditySha3(carAvailable.token);
+
+    console.log("RENTER BOOKING:");
+    console.log("secretLink:", secretLink);
+    console.log("Hash lock for Renter:", hashlockRenter);
 
     await contract.methods.renterBooking(
         car.address,
@@ -94,9 +126,10 @@ beforeEach(async() => {
         hashlockRenter.vrs.s,
         hashlockRenter.vrs.v,
         hashlockRenter.message).send({
-            from: accounts[1],
+            from: accounts[11],
             gas: MAX_GAS
-        });    
+        }
+    );    
 });
 
 describe('dPACE Deployment', () => {
@@ -107,78 +140,62 @@ describe('dPACE Deployment', () => {
         }
     });
 
-    it('Cancel Booking', async () => {
-        assert.equal(await contract.methods.renter_state(accounts[1]).call(),2);
-        await contract.methods.cancelBooking(
-            hashlockCar.vrs.r,
-            hashlockCar.vrs.s,
-            hashlockCar.vrs.v,
-            hashlockCar.message).estimateGas({
-            from: accounts[1],
-            gas: 5000000}, function(error, gasAmount){
-                console.log('Gas Amount cancel booking: ', gasAmount);
-        });
+    it('Car Submits Fee', async () => {
+        console.log("CAR BOOKING:")
+        console.log("Hash lock for Car: ", hashlockCar);
 
-        await contract.methods.cancelBooking(
-            hashlockCar.vrs.r,
-            hashlockCar.vrs.s,
-            hashlockCar.vrs.v,
-            hashlockCar.message).send({
-                from: accounts[1],
-                gas: MAX_GAS
-            });    
-        assert.equal(await contract.methods.renter_state(accounts[1]).call(),1);
-    });
-
-    it('Force End', async () => {
-        contract.events.E_forcedEnd({},
-            function(error, event){
-                let forcedEnd  = event.returnValues;
-                console.log("Car was paid:", forcedEnd);
-            }
-        );
-        assert.equal(await contract.methods.renter_state(accounts[1]).call(),2);
-        assert.equal(await contract.methods.car_state(accounts[9]).call(),1);
-        
         await contract.methods.carBooking(
             renter.address,
             hashlockCar.vrs.r,
             hashlockCar.vrs.s,
             hashlockCar.vrs.v,
             hashlockCar.message).send({
-                from: accounts[9],
+                from: accounts[10],
                 gas: MAX_GAS
-            });
+            });   
 
-        assert.equal(await contract.methods.car_state(accounts[9]).call(),2);
-        assert.equal(await contract.methods.renter_state(accounts[1]).call(),2);
-
+        contract.events.E_carPaid({},
+            function(error, event){
+                eventPaid = event.returnValues;
+            }
+        );
+        //Generate new token
         const newToken = web3.utils.soliditySha3(Math.floor((Math.random() * 10) + 1));
-        const newLocation = "Washington";
-        try{ await contract.methods.forceEnd(renter.address, newToken, newLocation).send({
-            from: accounts[9],
-            gas: MAX_GAS 
-        })} catch(err){
-            console.log(err.message);
-        };
-        assert.equal(await contract.methods.car_state(accounts[9]).call(),2);
-        assert.equal(await contract.methods.renter_state(accounts[1]).call(),2);
+        const newLocation = "Bolsoi Theater";
+        const signedTime = signTime(car.address,renter);
 
-        await advanceTimeAndBlock(87000);
-
-        await contract.methods.forceEnd(renter.address, newToken, newLocation).estimateGas({
-            from: accounts[9],
-            gas: 5000000}, function(error, gasAmount){
-                console.log('Gas Amount force end: ', gasAmount);
-        });
-
-        await contract.methods.forceEnd(renter.address, newToken, newLocation).send({
-            from: accounts[9],
-            gas: MAX_GAS 
+        console.log("CAR PAYMENT:")
+        console.log("new token:",newToken);
+        console.log("signed time: ", signedTime);
+        
+        await contract.methods.carPayment(
+            '0x'+hashlockCar.prn,
+            '0x'+hashlockCar.prn,
+            newToken,
+            newLocation,
+            signedTime.vrs.r,
+            signedTime.vrs.s,
+            signedTime.vrs.v,
+            signedTime.message
+        ).send({
+            from: accounts[10],
+            gas: MAX_GAS
         })
+        //Renter pays
+        const signedFee = signFee(eventPaid.fee,renter.address,car);
+        console.log("RENTER PAYMENT:")
+        console.log("signed fee: ", signedFee);
 
-        assert.equal(await contract.methods.car_state(accounts[9]).call(),1);
-        assert.equal(await contract.methods.renter_state(accounts[1]).call(),1);
+        await contract.methods.renterPayment(
+            '0x'+hashlockRenter.prn,
+            signedFee.vrs.r,
+            signedFee.vrs.s,
+            signedFee.vrs.v,
+            signedFee.message
+        ).send({
+            from: accounts[11],
+            gas: MAX_GAS
+        })
     });
 });
 
@@ -201,6 +218,43 @@ function generateHashlock(address,sender){
         'vrs': vrs,
         'message': message,
         'prn': prn
+    }
+}
+
+function signTime(address, sender){
+    const timestamp = new Date().getTime();
+    const message = {
+        'destination': address,
+        'hashlock': false,
+        'content': Math.floor(timestamp/1000)+43200
+    }
+    const encodedMessage = web3.eth.abi.encodeParameters(
+        ['address','bool', 'uint'],
+        [message.destination ,message.hashlock,message.content]
+    );
+    const signature = EthCrypto.sign(sender.privateKey, web3.utils.soliditySha3(encodedMessage));
+    const vrs = EthCrypto.vrs.fromString(signature);
+    return {
+        'vrs': vrs,
+        'message': message,
+    }
+}
+
+function signFee(fee,address, sender){
+    const message = {
+        'destination': address,
+        'hashlock': false,
+        'content': fee
+    }
+    const encodedMessage = web3.eth.abi.encodeParameters(
+        ['address','bool', 'uint'],
+        [message.destination ,message.hashlock,message.content]
+    );
+    const signature = EthCrypto.sign(sender.privateKey, web3.utils.soliditySha3(encodedMessage));
+    const vrs = EthCrypto.vrs.fromString(signature);
+    return {
+        'vrs': vrs,
+        'message': message,
     }
 }
 
@@ -238,3 +292,7 @@ advanceTimeAndBlock = async (time) => {
     await advanceBlock()
     return Promise.resolve(web3.eth.getBlock('latest'))
   }
+/*
+prn hashlock of renter 106856829185549679762782776365709913978689241931024315856266251056497126125419
+prn hashlock of car 31804621961787632604473691795649880963855079757126317673756712535208159012416
+*/

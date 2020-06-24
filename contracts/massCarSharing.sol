@@ -44,7 +44,7 @@ contract massCarSharing{
     mapping(uint256 => bool)        keyImageUsed;
 
     //Constants
-    uint public     DEPOSIT                 = 5 ether;
+    uint public     DEPOSIT                 = 0.5 ether;
     uint public     PERIOD                  = 86400;
     address public  REGISTRATION_SERVICE    = 0x1900A200412d6608BaD736db62Ba3352b1a661F2;
 
