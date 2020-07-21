@@ -1,33 +1,68 @@
-/* If we would require(MassCarSharing.sol), the node engine would attempt to
-execute it as if it is a javascript file, so we use 'path' & 'fs'
-to read in the contents of the file differently
-These are standard modules so no need to npm install them */
 const path = require('path');
-const fs = require('fs');
 const solc = require('solc');
+const fs = require('fs-extra');
 
-// the path to MassCarSharing.sol, __dirname is a constant defined by node and
-// will always return the valid current working directory
-const massCarSharingPath = path.resolve(__dirname, 'contracts', 'massCarSharing.sol');
-// This reads the contents of the file using the filesystem (fs) module
-const source = fs.readFileSync(massCarSharingPath, 'UTF-8');
+const buildPath = path.resolve(__dirname, 'build');
+fs.removeSync(buildPath);
 
-// The actual compile statement, changed according to most recent section "using the compiler" in Solidity documentation
-// module.exports makes the compiled files available to others
-const compiledContract = solc.compile(JSON.stringify({
-   language: "Solidity",
-   sources: {
-      ":massCarSharing": {
-         content: source
-      }
-   },settings: {
-      outputSelection: {
-         "*": {
-            "massCarSharing": ["abi", "evm.bytecode.object"] //carSharing needs to be the same name as the contract!!
-         }
-      }
-      }
-   })
-); 
+const contractPath = path.resolve(__dirname,'contracts');
 
-module.exports = JSON.parse(compiledContract).contracts[':massCarSharing'].massCarSharing;
+console.log(contractPath);
+fs.readdir(contractPath, (err, files) => {
+    if (err) {
+      console.error("Could not list the directory.", err);
+      process.exit(1);
+    } else {
+        var path;
+        var source;
+        var output = new Array();
+
+        files.forEach( (file,_) => {
+            path = path.resolve(__dirname,'contracts', file)
+            source = fs.readFileSync(path);
+            output.append(solc.compile(JSON.stringify({
+                language: "Solidity",
+                sources: {
+                    ":".concat(file.slice(0,-3)): {
+                        content: source
+                    }
+                },settings: {
+                    outputSelection: {
+                        "*": {
+                            file: ["abi", "evm.bytecode.object"]
+                        }
+                    }
+                }
+            })))
+        }); 
+          
+       
+    };
+});
+
+const dPACEPath = path.resolve(__dirname,'contracts', 'dPACE.sol');
+const source = fs.readFileSync(dPACEPath, 'utf8');
+const output = solc.compile(JSON.stringify({
+    language: "Solidity",
+    sources: {
+       ":dPACE": {
+          content: source
+       }
+    },settings: {
+       outputSelection: {
+          "*": {
+             "dPACE": ["abi", "evm.bytecode.object"] //carSharing needs to be the same name as the contract!!
+          }
+       }
+       }
+    })
+ ); 
+
+fs.ensureDirSync(buildPath);
+
+for (let contract in output){
+    fs.outputJsonSync(
+        path.resolve(buildPath, contract + '.json'),
+        output[contract]
+    );
+}
