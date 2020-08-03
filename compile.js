@@ -6,63 +6,69 @@ const buildPath = path.resolve(__dirname, 'build');
 fs.removeSync(buildPath);
 
 const contractPath = path.resolve(__dirname,'contracts');
+var sources = new Array();
 
-console.log(contractPath);
 fs.readdir(contractPath, (err, files) => {
     if (err) {
       console.error("Could not list the directory.", err);
       process.exit(1);
     } else {
-        var path;
-        var source;
-        var output = new Array();
-
         files.forEach( (file,_) => {
-            path = path.resolve(__dirname,'contracts', file)
-            source = fs.readFileSync(path);
-            output.append(solc.compile(JSON.stringify({
-                language: "Solidity",
-                sources: {
-                    ":".concat(file.slice(0,-3)): {
-                        content: source
-                    }
-                },settings: {
-                    outputSelection: {
-                        "*": {
-                            file: ["abi", "evm.bytecode.object"]
-                        }
-                    }
-                }
-            })))
-        }); 
-          
-       
+            sources.push(fs.readFileSync(contractPath + '/' + file,'UTF-8'));
+        });
     };
 });
 
-const dPACEPath = path.resolve(__dirname,'contracts', 'dPACE.sol');
-const source = fs.readFileSync(dPACEPath, 'utf8');
-const output = solc.compile(JSON.stringify({
-    language: "Solidity",
-    sources: {
-       ":dPACE": {
-          content: source
-       }
-    },settings: {
-       outputSelection: {
-          "*": {
-             "dPACE": ["abi", "evm.bytecode.object"] //carSharing needs to be the same name as the contract!!
-          }
-       }
-       }
-    })
- ); 
-
+var output;
 fs.ensureDirSync(buildPath);
 
-for (let contract in output){
-    fs.outputJsonSync(
-        path.resolve(buildPath, contract + '.json'),
-        output[contract]
-    );
+//Timeout is used, since JS fires off a callback upon fs.readdir, which takes some time to complete. 
+setTimeout(() => {
+    const input = {
+        language: "Solidity",
+        sources: {
+            "PKI.sol": {
+                content: sources[0]
+            },
+            "Verify_deployRenter.sol": {
+                content: sources[1]
+            },
+            "Verify_renterBooking.sol": {
+                content: sources[2]
+            },
+            "Verify_renterPayment.sol": {
+                content: sources[3]
+            },
+            "dPACE.sol": {
+                content: sources[4]
+            },        
+        },settings: {
+            outputSelection: {
+                "*": {
+                    "*": ["abi", "evm.bytecode.object"]
+                }
+            }
+        }
+    };
+    output = JSON.parse(solc.compile(JSON.stringify(input),
+        { import: findImports })).contracts;
+    
+    for (let contract in output){
+        fs.outputJsonSync(
+            path.resolve(buildPath, contract.slice(0,-4) + '.json'),
+            output[contract]
+            );
+        }
+    },       
+    100
+);
+
+
+
+
+function findImports(path) {
+    return {
+        contents:
+            fs.readFileSync(contractPath + '/' + path,'utf8')
+    };
 }

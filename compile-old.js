@@ -14,6 +14,7 @@ const source = fs.readFileSync(dPACEPath, 'UTF-8');
 
 // The actual compile statement, changed according to most recent section "using the compiler" in Solidity documentation
 // module.exports makes the compiled files available to others
+console.log(dPACEPath);
 const compiledContract = solc.compile(JSON.stringify({
    language: "Solidity",
    sources: {
