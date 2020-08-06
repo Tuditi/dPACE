@@ -3,13 +3,13 @@ const ganache = require('ganache-cli');
 const EthCrypto = require('eth-crypto');
 const hashjs = require('ethereumjs-abi');
 const Web3 = require ('web3');
-const Prng = require('../ownSignature/lib/prng')
+const Prng = require('../ringSignature/lib/prng')
 // Initiate a new instance of web3 that uses ganache for local development.
 // Once in production, this needs to be changed to test network.
 const web3 = new Web3(ganache.provider());
 require('events').EventEmitter.defaultMaxListeners = 100;
 
-const {abi, evm} = require('../compile');
+const {abi, evm} = require('../scratch/compile-old');
 const MAX_GAS = '6721975'
 
 let contract;     //Holds instance of our contract

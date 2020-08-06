@@ -54,11 +54,20 @@ setTimeout(() => {
         { import: findImports })).contracts;
     
     for (let contract in output){
-        fs.outputJsonSync(
+        //If library, they have to be kept separately
+        if (contract === 'verify_libs.sol'){
+            for (let lib in output[contract]){
+                fs.outputJsonSync(
+                    path.resolve(buildPath, lib + '.json'),
+                    output[contract]);
+            }
+        }
+        else { 
+            fs.outputJsonSync(
             path.resolve(buildPath, contract.slice(0,-4) + '.json'),
             output[contract]
             );
-        }
+        }}
     },       
     100
 );

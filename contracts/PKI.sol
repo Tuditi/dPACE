@@ -10,7 +10,7 @@ contract PKI{
     }
 
     function getPk(address a) public view returns(uint) {
-        require(hasAnnounced[a]);
+        require(hasAnnounced[a]);  
         return pks[a];
     }
 }
