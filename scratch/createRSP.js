@@ -16,6 +16,6 @@ var integer = new Array();
 
 zkp.forEach( (element)=> integer.push(web3.utils.hexToNumberString(element)));
 console.log(integer);
-console.log(web3.utils.toHex('1000000000000000020'))
+console.log(web3.utils.toHex('1000000000000000000'))
 //console.dir(identityRSP);
 //console.dir(identityRSP.privateKey.slice(2));

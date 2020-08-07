@@ -95,7 +95,7 @@ beforeEach(async() => {
         gas: MAX_GAS
     });
 
-    console.log("DEPLOY RENTER:");
+    console.log("DEPLOY CAR:");
     console.log("details:", details);
     console.log("price:", web3.utils.toWei('0.000011574','ether'));
 
@@ -183,8 +183,11 @@ describe('dPACE Deployment', () => {
         })
         //Renter pays
         const signedFee = signFee(eventPaid.fee,renter.address,car);
+        //Here encrypted fee according to zkay encryption
+        const hardcodedFee = signFee('474209928000000020',renter.address,car); 
         console.log("RENTER PAYMENT:")
         console.log("signed fee: ", signedFee);
+        console.log("INput to REMIX:", hardcodedFee);
 
         await contract.methods.renterPayment(
             '0x'+hashlockRenter.prn,
