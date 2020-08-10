@@ -6,7 +6,7 @@ const PublicKey = require('./publicKey.js');
 
 class Hasher{
     constructor(){
-        this.ec = new EcDSA.ec("bn256");
+        this.ec = new EcDSA.ec("secp256k1");
     }
 
     get curve(){
@@ -32,7 +32,6 @@ class Hasher{
     }
     //Function that hashes the x-coodinate and calculates the corresponding y-coordinate
     hash_point(point){
-        console.log("Y-value of point(JS):")
         let hash = web3.utils.toBN(web3.utils.soliditySha3(point.x));
         let mod_hash = hash.mod(this.l);
         let on_curve = false;
@@ -83,7 +82,6 @@ class Hasher{
         }else if(array[i].x !== undefined && array[i].y !== undefined){
             hash_array.push(this.hash_string(array[i].encode('hex').toString()));
         }else{
-            console.log(array[i]);
             throw 'hash_array() case not implemented';
         }
         }
