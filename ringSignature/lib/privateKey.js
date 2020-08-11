@@ -11,15 +11,28 @@ const Signature = require('./signature.js');
 class PrivateKey{
     constructor(identity, hasher){
         // identity is ethCrypto object: const identity = ethCrypto.createIdentity();
-      
-        this.value = web3.utils.toBN(identity.privateKey);    
+        this.counter = 0;
+        this.value = web3.utils.toBN(identity);    
         this.hasher = hasher;
-        this.public_key = new PublicKey(this.hasher.G.mul(this.value),this.hasher);
+        this.public_keys = this.generateOTPK();
         this.key_image = this.hasher.hash_point(this.public_key.point).mul(this.value); //I = x*Hp(P), this needs to be changed in something specific for the transaction
     }
 
     get point(){
         return this.public_key.point;
+    }
+
+    generateOTPK(){
+      console.log("Counter before:", this.counter)
+      this.counter++;
+      var OTPK_array = new Array();
+      for (let i = this.counter; i <= 10+this.counter; i++) {
+        const preimage = web3.utils.toBN(i).mul(this.value);
+        const hash = this.hasher.hash_string(web3.utils.toHex(preimage));
+        OTPK_array.push(new PublicKey(this.hasher.G.mul(hash)));
+      };
+      this.counter = i;
+      return OTPK_array;
     }
 
     sign(message, foreign_keys){

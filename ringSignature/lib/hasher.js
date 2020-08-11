@@ -6,7 +6,7 @@ const PublicKey = require('./publicKey.js');
 
 class Hasher{
     constructor(){
-        this.ec = new EcDSA.ec("secp256k1");
+        this.ec = new EcDSA.ec("alt_bn128");
     }
 
     get curve(){

@@ -4,7 +4,12 @@ contract PKI{
     mapping(address => uint) pks;
     mapping(address => bool) hasAnnounced;
 
-    function announcePk(uint pk) public {
+    modifier notAnounced() public {
+        require(hasAnnounced[msg.sender] = false);
+        _;
+    }
+
+    function announcePk(uint pk) notAnnounced() public {
         pks[msg.sender] = pk;
         hasAnnounced[msg.sender] = true;
     }
