@@ -12,27 +12,14 @@ class PrivateKey{
     constructor(identity, hasher){
         // identity is ethCrypto object: const identity = ethCrypto.createIdentity();
         this.counter = 0;
-        this.value = web3.utils.toBN(identity);    
+        this.value = identity;    
         this.hasher = hasher;
-        this.public_keys = this.generateOTPK();
+        this.public_key = new PublicKey(this.hasher.G.mul(this.value),this.hasher);
         this.key_image = this.hasher.hash_point(this.public_key.point).mul(this.value); //I = x*Hp(P), this needs to be changed in something specific for the transaction
     }
 
     get point(){
         return this.public_key.point;
-    }
-
-    generateOTPK(){
-      console.log("Counter before:", this.counter)
-      this.counter++;
-      var OTPK_array = new Array();
-      for (let i = this.counter; i <= 10+this.counter; i++) {
-        const preimage = web3.utils.toBN(i).mul(this.value);
-        const hash = this.hasher.hash_string(web3.utils.toHex(preimage));
-        OTPK_array.push(new PublicKey(this.hasher.G.mul(hash)));
-      };
-      this.counter = i;
-      return OTPK_array;
     }
 
     sign(message, foreign_keys){
@@ -109,7 +96,7 @@ class PrivateKey{
       let rr_array = [];
   
       for(let i=0;i<all_keys.length;i++){
-        let rri =all_keys[i].point;
+        let rri = all_keys[i].point;
         rri = this.hasher.hash_point(rri);
         rri = rri.mul(web3.utils.toBN(q_array[i],16));
         if(all_keys[i] instanceof PublicKey){
@@ -141,7 +128,7 @@ class PrivateKey{
         if(all_keys[i] instanceof PublicKey){
           r_array.push(web3.utils.toBN(q_array[i],16));
         }else{
-          let ri = web3.utils.toBN(q_array[i],16).sub(all_keys[i].value.mul(c_array[i]));
+          let ri = web3.utils.toBN(q_array[i],16).sub(web3.utils.toBN(all_keys[i].value).mul(c_array[i]));
           ri = ri.umod(this.hasher.l);
           r_array.push(ri);
         }

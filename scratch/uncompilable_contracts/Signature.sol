@@ -16,6 +16,9 @@ contract Signature {
     mapping (uint256 => bool) public lookup_pubkey_by_balance_populated;
     mapping (uint256 => uint256) public lookup_pubkey_by_balance_count;
 
+    //Storage of Spent Key Images
+    mapping (uint256 => bool) public KeyImageUsed;
+    
     //Debug variables
     uint256[32] ring_signature;
     uint256[2]  hash_point;
