@@ -1,5 +1,5 @@
 pragma solidity ^0.6.4;
-
+//Useful link: https://www.johannes-bauer.com/compsci/ecc/#anchor12
 contract Signature {
 
      //alt_bn128 constants     
@@ -16,9 +16,6 @@ contract Signature {
     mapping (uint256 => bool) public lookup_pubkey_by_balance_populated;
     mapping (uint256 => uint256) public lookup_pubkey_by_balance_count;
 
-    //Storage of Spent Key Images
-    mapping (uint256 => bool) public KeyImageUsed;
-    
     //Debug variables
     uint256[32] ring_signature;
     uint256[2]  hash_point;
@@ -49,7 +46,7 @@ contract Signature {
 
     //Base EC Functions
     function ecAdd(uint256[2] memory p0, uint256[2] memory p1)
-        internal returns (uint256[2] memory p2)
+        public returns (uint256[2] memory p2)
     {
         assembly {
             //Get Free Memory Pointer
@@ -75,7 +72,7 @@ contract Signature {
     }
 
     function ecMul(uint256[2] memory p0, uint256 s)
-        internal returns (uint256[2] memory p1)
+        public returns (uint256[2] memory p1)
     {
         assembly {
             //Get Free Memory Pointer
@@ -360,7 +357,6 @@ contract Signature {
     //      signature[1] - c0 - start of ring signature - scaler for PublicKey[0]
     //      signature[2     ... 2+(N-1)] - s0...s[N-1], scalar for G1
     //      signature[2+N   ... 2*N+1  ] - Public Keys (compressed) - total of N Public Keys
-    //      signature[2*N+2 ... 31     ] - Padding (0)
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
     //Outputs:
     //  success (bool) - true/false indicating if signature is valid on message

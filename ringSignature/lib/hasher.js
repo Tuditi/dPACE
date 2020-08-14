@@ -21,6 +21,10 @@ class Hasher{
         return this.ec.curve.n;
     }
 
+    get p(){
+        return this.ec.curve.p;
+    }
+
     // A cryptographic Hash function H_s
     hash_string(message){
         let msgHash = web3.utils.soliditySha3(message)
@@ -37,7 +41,8 @@ class Hasher{
         let on_curve = false;
         while(!on_curve){
             try{
-                point = this.ec.curve.pointFromX(mod_hash,true);
+                let odd = point.x.isOdd();
+                point = this.ec.curve.pointFromX(mod_hash,odd);                
                 on_curve = true;
             } catch(err) {
                 mod_hash = mod_hash.add(web3.utils.toBN(1,16));

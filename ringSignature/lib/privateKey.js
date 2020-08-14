@@ -7,17 +7,15 @@ const Signature = require('./signature.js');
 
 
 //This is the random one-time secret key, which is used to calculate the key image.
-//As a private key, we propose the private key concatenated with the randomly generated accessToken
 class PrivateKey{
     constructor(identity, hasher){
-        // identity is ethCrypto object: const identity = ethCrypto.createIdentity();
         this.counter = 0;
         this.value = identity;    
         this.hasher = hasher;
         this.public_key = new PublicKey(this.hasher.G.mul(this.value),this.hasher);
-        this.key_image = this.hasher.hash_point(this.public_key.point).mul(this.value); //I = x*Hp(P), this needs to be changed in something specific for the transaction
+        this.key_image = this.hasher.hash_point(this.public_key.point).mul(this.value); 
     }
-
+    
     get point(){
         return this.public_key.point;
     }
