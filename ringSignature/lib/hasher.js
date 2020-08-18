@@ -16,11 +16,11 @@ class Hasher{
     get G(){
         return this.ec.g;
     }
-
+    //Order of the elliptic curve => How much unique points
     get l(){
         return this.ec.curve.n;
     }
-
+    //Prime over which the field is defined.
     get p(){
         return this.ec.curve.p;
     }

@@ -12,6 +12,7 @@ class PrivateKey{
         this.counter = 0;
         this.value = identity;    
         this.hasher = hasher;
+        console.log("Generator Point",web3.utils.toHex(this.hasher.G.x));
         this.public_key = new PublicKey(this.hasher.G.mul(this.value),this.hasher);
         this.key_image = this.hasher.hash_point(this.public_key.point).mul(this.value); 
     }
