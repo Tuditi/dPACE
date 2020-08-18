@@ -1,4 +1,4 @@
-pragma solidity ^0.6.4;
+pragma solidity ^0.5;
 //Useful link: https://www.johannes-bauer.com/compsci/ecc/#anchor12
 contract Signature {
 
@@ -10,12 +10,7 @@ contract Signature {
     //Used for Point Compression/Decompression
     uint256 constant public ECSignMask = 0x8000000000000000000000000000000000000000000000000000000000000000;
     uint256 constant public a = 0xc19139cb84c680a6e14116da060561765e05aa45a1c72a34f082305b61f3f52; // (p+1)/4
-
-    //Convenience tables for looking up acceptable mix-in keys
-    mapping (uint256 => uint256[]) public lookup_pubkey_by_balance;
-    mapping (uint256 => bool) public lookup_pubkey_by_balance_populated;
-    mapping (uint256 => uint256) public lookup_pubkey_by_balance_count;
-
+    
     //Debug variables
     uint256[32] ring_signature;
     uint256[2]  hash_point;
@@ -23,13 +18,7 @@ contract Signature {
     uint256     evaluate_y;
     bool        x_on_curve;
 
-
-    //Events
-
-    event E_hashString(uint256 indexed);
-    event E_ringSignature(uint[32] indexed signature);
-    event E_success(bool indexed);
-
+    
     //=== RingVerifyN ===
     //Inputs:
     //  destination (address[]) - list of payable ETH addresses
