@@ -1,4 +1,5 @@
 pragma solidity ^0.5;
+//Credits to: https://www.reddit.com/r/ethereum/comments/75rzdn/linkable_ring_signatures_on_ropsten/
 //Useful link: https://www.johannes-bauer.com/compsci/ecc/#anchor12
 contract Signature {
 
