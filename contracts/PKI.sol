@@ -5,7 +5,7 @@ contract PKI{
     mapping(address => bool)    hasAnnounced;
     mapping(address => uint[5]) pkRingSign;     //Possible Public Keys tied to an Ethereum address. Each key can be used for one booking.
 
-    function announcePkZk(uint pk) notAnnounced() public {
+    function announcePkZk(uint pk) public {
         pkZkay[msg.sender] = pk;
         hasAnnounced[msg.sender] = true;
     }
@@ -15,12 +15,12 @@ contract PKI{
         return pkZkay[a];
     }
 
-    function announcePkRingSign(uint[5] pks) public {
+    function announcePkRingSign(uint[5] memory pks) public {
         pkRingSign[msg.sender] = pks;
         hasAnnounced[msg.sender] = true;
     }
 
-    function getPkRingSign(address a) public view returns(uint[5]) {
-        return pkZkay[a];
+    function getPkRingSign(address a) public view returns(uint[5] memory) {
+        return pkRingSign[a];
     }
 }

@@ -1,54 +1,116 @@
 # Thesis
 Master's Thesis on the design of a privacy-preserving car sharing protocol implemented on the Ethereum blockchain for the department Electrical Engineering of the KU Leuven.
 
+Smart Contract Address: 0xc14223F938f4024bF5A9113c2551BA5e8E1f7a41
+
 Steps to reproduce:
 
 Step 1)
 
 Deploy all smart contracts to the blockchain:
 
-- PKI: Contains the Public Key Infrastructure necessary to support zk-proofs and ring signatures. (gas = 324,046)
-- Signature: Contains the functions to generate and verify ring signatures. (gas = 1,578,566)
-- Verify_deployRenter: Contains the verification circuit of the zk-proof that is used to deploy a renter. Checks whether encrypted value of the inital balance >= Deposit. (gas = 1,306,091)
-- Verify_renterBooking: Contains the verification circuit for the zk-proof used to book a car by the renter. Checks whether encrypted balance >= necessary deposit. (gas = 1,306,079)
-- Verify_renterPayment: Contains the verification circuit for the zk-proof that is supplied when the renter pays the fee. Checks whether the encrypted new balance equals the encrypted current balance minus the encrypted fee. (gas = 1,305,647)
-- dPACE: handles the functions related to booking and payment of a smart contract. This is the interface with which the actors (Car Owner, Car Renter and Car interact with). Upon deployment the constructor expects the addresses of the previously defined smart contracts. (gas = 4,731,498)
+- PKI: Contains the Public Key Infrastructure necessary to support zk-proofs and ring signatures. (gas = 324 046)
+- Signature: Contains the functions to generate and verify ring signatures. (gas = 1 578 566)
+- Verify_deployRenter: Contains the verification circuit of the zk-proof that is used to deploy a renter. It checks whether the encrypted value of the inital balance >= Deposit. (gas = 1 306 091)
+- Verify_renterBooking: Contains the verification circuit for the zk-proof used to book a car by the renter. It checks whether the encrypted balance >= necessary deposit. (gas = 1 306 079)
+- Verify_renterPayment: Contains the verification circuit for the zk-proof that is supplied when the renter pays the fee. It checks whether the encrypted new balance equals the encrypted current balance minus the encrypted fee. (gas = 1 305 647)
+- dPACE: handles the functions related to booking and payment of a smart contract. This is the interface with which the actors (Car Owner,Car Renter and Car interact with). Upon deployment the constructor expects the addresses of the previously defined smart contracts. (gas = 4 731 498)
 
-Together with the deployment of the Verify smart contracts, the library that performs elliptic curve operations (BN256G2) and pairings (Pairing) is deployed. The linking of the verification smart contracts and the libraries happen automatically. (gas = 1271585 + 912773)
+Together with the deployment of the Verify smart contracts, the library that performs elliptic curve operations (BN256G2) and pairings (Pairing) is deployed. The linking of the verification smart contracts and the libraries happen automatically. (gas = 1 271 585 + 912 773)
 
 Step 2)
 
-Announce Public Keys for zkay in the PKI-contract-> This uses dummy encryption enc(msg,pk) = msg+pk
-(gas = 62,535)
+Announce Public Keys for zkay in the PKI-contract -> This uses dummy encryption enc(msg,pk) = msg+pk
+(gas = 62 535)
 
 Step 3) Generate alt_bn 128 keys in Sage
 
 Script: 
 F = FiniteField(0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47)
-C = EllipticCurve(F,[0,3]) //Definition of the curve: y²=x³+3
+C = EllipticCurve(F","[0","3]) //Definition of the curve: y²=x³+3
 G = C.point((1,2))
-PrivateKey = randombits(256)
+PrivateKey = getrandbits(256)
 PublicKey = PrivateKey*G
 
-Step 4) Announce compressed public keys (e.g. 5) of car and renter in PKI. These can be used by anyone as mix-in keys. The renter can use the private key corresponding to their public key once to mitigate replay attacks. (An adversary could impersonate someone by using previously published key material.)
+Examples:
+Compressed Keys of Cars:
+1: 75388758861696767660776991192470811736833797212609586436248966857117812298935 
+priv: 33104690919668679528455559605964077817714129302606852847478209309637467952386
+
+2:19178589128764610310748492534603262389808294516461821608491456333870920074454
+priv: 54231895494669109983683459000405650833284090240213331242819938647543771647685
+
+3:4036862361553817509564101810480063170306522861584419870548732744625098168124
+priv: 81985730952232721340084417592903943186346325750286029871710063411187174012482
+
+4:21753617848810380079136101920416107405035426186274188766140405845700718110705
+priv:36460415414625705258462402568084797276001053238512748011192477856531943230503
+
+5: 69065590705878386185531396091048248228773202703726364024341872602394441762899
+priv: 67043945539474792912811070411657065027974442464440325288058621419136005064899
+
+
+Compressed Keys of Renters:
+1: 60156146098115357779258372691844785671525135207906898881109920582145405606888 priv:64825227547210268970153335557721737541745377559686715122911488390160076326620
+
+2: 58666023121968936248381274462141284322583560803696874538001398246700309532385
+priv: 35558838047997634269881602226502378909737632844820076526061657084559776981144
+
+3: 74057537755323003859723335075901213005448827948074870718343568755662866069398
+priv: 111286620953479086608273685789447005641110048906522825965849529610721168815668
+
+4: 10190576241874222939637354924820161267059856915474121181300394722631558010629
+priv: 10190576241874222939637354924820161267059856915474121181300394722631558010629
+
+5: 69777773939498513679323692058122448566640965463998619347615651458735047271196
+priv: 27362424672078174293200496158932957243792476829045451497973260121271400485855
+
+Step 4) Announce compressed public keys (e.g. 5) of car and renter in PKI. These can be used by anyone as mix-in keys. The renter can use the private key corresponding to their public key once to mitigate replay attacks. (An adversary could otherwise impersonate someone by using previously published key material.)
 
 Step 5)
 
-Deploy Car (by car owner) (gas = 86,560)
-Validate Car (by car) (gas = 49,149)
-Deploy Renter (by car renter) with a zk-proof for 1 ether (gas = 541,610):
+Deploy Car (by car owner) (gas = 86 560)
+Validate Car (by car) (gas = 49 149)
+Deploy Renter (by car renter) with a zk-proof for 1 ether (gas = 541 610):
 ["0x134561ab48445aeabec225028b7cd87a8e5a354498f509b031f329a771041912","0x031429a0dbee4f13488dee528c6433769fc9ce553dc61bd6f4d1207e1d16bb79","0x02e1771807d91e429237288c4ee82d612db124aa7d8bccd5ece3abff3d7c0137","0x2db59bb4c35d41388b3b9a1823cfe1c6b18fa0b1877760724464fb4fce9a374f","0x18f3613e60bc6dde487e413dfd9d47516851771bf8494167ae24c2220b03a648","0x1a8d00480bbdea4323f92c25c8b8be56d1309237e3798fd11d996c479bbf8ed6","0x0071ff2d1c53284f289bd529b95ea480283ec8435b0efc671ed5773d7e95fc3b","0x168196550842267ac3fb6cbbd76da6a759f6b9d46e7e31b6b77c77e570889d46"]
 
 
+Step 6) Generate Hashlock for the renter and ring signature and zk-proof that balance >= 1
 
-Step 6) Generate Hashlock for the renter and ring signature
+Hash Lock: H(2b83d0dda242972405243158d42777c18ceef580f5fd7ea754e6a2430864d3a1) = 26370127040871945818104445799339553615752739547062458765596186859998854036310
+
+Corresponding Ring Signature: ["9943909271756107783702068429563612396098550531453918697548889849795118335104","13043364801379212567193335405779730267897176149964660523097406462743396179094","19078329960756585638682601973833581020223298145032648133497706724607659933129","68048768745595257679661390894582677448524723374177622913056688471623391870522","108648422692552217088883229112462938031935803158392654808847232264529792612213","3617651885799713344819586107014285839613037571776757578269010110395575020499","20289328268986616295401638054341305133316394464446477069102679813555175576086","19178589128764610310748492534603262389808294516461821608491456333870920074454","4036862361553817509564101810480063170306522861584419870548732744625098168124","21753617848810380079136101920416107405035426186274188766140405845700718110705","69065590705878386185531396091048248228773202703726364024341872602394441762899","75388758861696767660776991192470811736833797212609586436248966857117812298935"]
+
+ZK-proof that renter has enough balance to book car:
+
+["0x1a13eb1f96c42ca94209f678ca83e77dfd3cdd39b4d87c06fc0a5b83d34a5626","0x15082a0273fb5740d2db490e9b8f233ae5f4877a95c4341755494599b5f233bc","0x1d2c8661dbd2fcdbee36da3e8265d4a5edfbbb153dfb41e9ae36dc5d77daaf37","0x23927fe51882cbfde6fbe8e99d21582763a0b3b8f08849fc4c9f8c6e46269de0","0x19a65cf096f33f36a8e518a5e7ea6d443cee189d35717a7bb9ef33351c2b645f","0x02a9d1a3cacddd368325be6f6bd03d14ab1e4d52d96a2480edf63fe704f49339","0x26acacc74ee36a88546f53ea13e51df79473ae723b464065ed1d31f58793ff6f","0x007c0344d67bb7193b3d22ebf0a76ec6d8762e50db965d05edad95c99c2a73a2"]
 
 Step 7) Generate Hashlock for the car and ring signature
+Hash Lock: H(2abf2f24ffcb0705a607382d6b6de93b599dec95229254f24f142787a6f7f204) = 84721890884921678045490238420539442892671580981378899225685732096925512833481
+
+Corresponding Ring Signature: ["1558708425586220924367677061862317307703363351792876483541974389308276997036","16483788083881248317002793570820355824202172294095528228514843874586500085069","9442799535882380606985566616422676163931840773183995754832376086686971932736","107219783814302048358318654216115714353887565673388704778130200454636930842339","15353252232397669386734343105532431940987404078979605900978599984554259830274","66134443702994960383450370409689623846906406017762543377619290626307501951746","28006189650572546434272630434000826130017542998437244575521665881336953070281","60156146098115357779258372691844785671525135207906898881109920582145405606888","58666023121968936248381274462141284322583560803696874538001398246700309532385","74057537755323003859723335075901213005448827948074870718343568755662866069398","10190576241874222939637354924820161267059856915474121181300394722631558010629","69777773939498513679323692058122448566640965463998619347615651458735047271196"]
 
 Step 8) Renter Booking
 
+gas = 1 058 655
+
 Step 9) Car Booking
 
-Step 10) Car Payment
+gas =  673 825
 
-Step 11) Renter Payment
+step 10) Renter signs timestamp 
+
+Timestamp is measured in unix time and used for calculating the fee of the rental.
+-> This value is sent back to the car and is used in step 11
+
+Step 11) Car Payment
+
+Submit the timestamp, the ring signature of the renter and the necessary information for a new booking (location, token, etc.)
+
+gas = 610 567
+
+Step 12)  Car signs encrypted fee
+
+Step 13) Renter Payment
+
+["0x00403a895d0ac1edc17f06da56b50396946a2483a5b600a77f1e14d4ae1fb699","0x2ccba2773757ce09c09556b84cf48f6e4a40c0e15fd76ca20b14717c9b182670","0x0c10d59c550bd2e9569cfd02be9a16f84e4339fb78fa348eb59ff84a46db64d4","0x0e78fcc176d223f5143b15307d3b8b089f73543da03f044bcad7ec32b4be2618","0x13bfefa7edcf6067a0b30f2454245b9c6ffad568b005a9083c969caee903f33f","0x2390ab3fae40cddfc1e77622f012d89be38dbe5e4d4590efa40c4afec8de4c96","0x18f9059439ccb777a82dc5563f4145aa4f72ce90466002620e2610a77e721292","0x0235f833a0e1d86e0db6fdd5ce91a7b1a829d9ffebf74757dbbf5dd3ba1be5ab"]

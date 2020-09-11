@@ -1,5 +1,4 @@
 pragma solidity ^0.5;
-//Credits to: https://www.reddit.com/r/ethereum/comments/75rzdn/linkable_ring_signatures_on_ropsten/
 //Useful link: https://www.johannes-bauer.com/compsci/ecc/#anchor12
 contract Signature {
 
@@ -331,7 +330,6 @@ contract Signature {
         //Calculate s s.t. alpha*G1 = c1*P1 + s1*G1 = (c1*x1 + s1) * G1
         //s = alpha - c1*x1*nonce
         ring_signature[2+data[0]] = SubMul(data[2+data[0]], c, data[1]);
-        emit E_ringSignature(ring_signature);
         return ring_signature;
     }
 
@@ -374,6 +372,5 @@ contract Signature {
         }
 
         success = (c == signature[1]);
-        emit E_success(success);
     }
 }
