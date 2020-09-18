@@ -3,6 +3,10 @@ Master's Thesis on the design of a privacy-preserving car sharing protocol imple
 
 Smart Contract Address: 0xc14223F938f4024bF5A9113c2551BA5e8E1f7a41
 
+Prerequisites:
+- zkay v. 0.1 (https://github.com/eth-sri/zkay/tree/ccs2019).
+This module is used to generate zk-proofs by following the instructions provided by them. This boils down to configuring the scenario.py file according to the specific needs of the programmer and running the scenario generator of zkay.
+
 Steps to reproduce:
 
 Step 1)
