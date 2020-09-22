@@ -87,6 +87,7 @@ contract dPACE{
         Verify_renterPayment_var = _verify_renterPayment;
         ringSignature = _signature;
     }
+
     //Modifiers
     modifier checkDeposit(){
         require(msg.value >= DEPOSIT,'Not enough deposit to enter system');
@@ -147,7 +148,7 @@ contract dPACE{
 		uint128[2] memory genHash = get_hash(geninputs);
 		Verify_deployRenter_var.check_verify(Verify_deployRenterproof, [genHash[0], genHash[1], uint(1)]);
 
-        //If valid proof that encrypted balance == msg.value:
+        //If valid proof encrypted balance == msg.value:
         
         PPCUsed[uint(keccak256(abi.encode(_v,_r,_s)))] = true;
         renter_state[msg.sender] = 1;
@@ -157,6 +158,7 @@ contract dPACE{
         emit E_deployRenter(msg.sender, _ppc);
     }
 
+    //Car owner deploys the car together with a deposit
     function deployCar(address _address, bytes32 _details, uint _price) public payable checkDeposit()
     {
         car_balance[_address] = msg.value;
@@ -165,6 +167,7 @@ contract dPACE{
         emit E_deployCar(_address, _details);
     }
 
+    //Car validates itself by sending a transaction to the smart contract containing a token and its location
     function validateCar(bytes32 _token, string memory _location) public
     {
         require(car_owner[msg.sender] != address(0),'Car not yet deployed');
