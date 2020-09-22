@@ -1,7 +1,7 @@
 # Thesis
 Master's Thesis on the design of a privacy-preserving car sharing protocol implemented on the Ethereum blockchain for the department Electrical Engineering of the KU Leuven.
 
-Smart Contract Address on the Rinkeby testnet: 0xc14223F938f4024bF5A9113c2551BA5e8E1f7a41
+Smart Contract Address on the Rinkeby testnet: 0x85f8e621548c9c2114Edca97FBd4D9B64Eb6820c
 
 Prerequisites:
 - zkay v. 0.1 (https://github.com/eth-sri/zkay/tree/ccs2019).
@@ -36,12 +36,12 @@ G = C.point((1,2))
 PrivateKey = getrandbits(256)
 PublicKey = PrivateKey*G
 
-Step 4) Announce compressed public keys (e.g. 5) of car and renter in PKI. These can be used by anyone as mix-in keys. The renter can use the private key corresponding to their public key once to mitigate replay attacks. (An adversary could otherwise impersonate someone by using previously published key material.)
+Step 4) Announce compressed public keys of car and renter in PKI. These can be used by anyone as mix-in keys. The renter can use the private key corresponding to their public key once to mitigate replay attacks. (An adversary could otherwise impersonate someone by using previously published key material.)
 
 Step 5)
 
-Deploy Car (by car owner) (gas = 86 560)
-Validate Car (by car) (gas = 49 149)
+Deploy Car (by car owner) (gas = 86 560)\n
+Validate Car (by car) (gas = 49 149)\n
 Deploy Renter (by car renter) with a zk-proof that the encrypted value of the balance equals the sent deposit. (gas = 541 610):
 
 Step 6) Generate Hashlock for the renter and ring signature and zk-proof that balance >= 1
