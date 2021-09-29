@@ -21,7 +21,7 @@
     "ethereumjs-abi": "^0.6.8",
     "ethereumjs-wallet": "^0.6.3",
     "ganache-cli": "^6.9.1",
-    "i": "^0.3.6",
+    "i": "^0.3.7",
     "jquery": "^3.4.1",
     "json-loader": "^0.5.7",
     "lightercollective": "^0.3.0",
