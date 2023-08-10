@@ -1,24 +1,24 @@
 pragma solidity ^0.5;
+
 //Useful link: https://www.johannes-bauer.com/compsci/ecc/#anchor12
 contract Signature {
-
-     //alt_bn128 constants     
-    uint256[2] public G1 = [1,2];
-    uint256 constant public N = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
-    uint256 constant public P = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
+    //alt_bn128 constants
+    uint256[2] public G1 = [1, 2];
+    uint256 public constant N = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
+    uint256 public constant P = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
 
     //Used for Point Compression/Decompression
-    uint256 constant public ECSignMask = 0x8000000000000000000000000000000000000000000000000000000000000000;
-    uint256 constant public a = 0xc19139cb84c680a6e14116da060561765e05aa45a1c72a34f082305b61f3f52; // (p+1)/4
-    
+    uint256 public constant ECSignMask =
+        0x8000000000000000000000000000000000000000000000000000000000000000;
+    uint256 public constant a = 0xc19139cb84c680a6e14116da060561765e05aa45a1c72a34f082305b61f3f52; // (p+1)/4
+
     //Debug variables
     uint256[32] ring_signature;
-    uint256[2]  hash_point;
-    uint256     hash_function;
-    uint256     evaluate_y;
-    bool        x_on_curve;
+    uint256[2] hash_point;
+    uint256 hash_function;
+    uint256 evaluate_y;
+    bool x_on_curve;
 
-    
     //=== RingVerifyN ===
     //Inputs:
     //  destination (address[]) - list of payable ETH addresses
@@ -34,9 +34,10 @@ contract Signature {
     //  success (bool) - true/false indicating if signature is valid on message
 
     //Base EC Functions
-    function ecAdd(uint256[2] memory p0, uint256[2] memory p1)
-        public returns (uint256[2] memory p2)
-    {
+    function ecAdd(
+        uint256[2] memory p0,
+        uint256[2] memory p1
+    ) public returns (uint256[2] memory p2) {
         assembly {
             //Get Free Memory Pointer
             let p := mload(0x40)
@@ -49,20 +50,21 @@ contract Signature {
 
             //Call ECAdd: call contract at address a with input mem[in..(in+insize)) providing g gas and v wei and output area mem[out..(out+outsize))
             //returning 0 on error (eg. out of gas) and 1 on success
-            let success := call(sub(gas(),2000), 0x06, 0, p, 0x80, p, 0x40)
+            let success := call(sub(gas(), 2000), 0x06, 0, p, 0x80, p, 0x40)
 
             // Use "invalid" to make gas estimation work
- 			switch success case 0 { revert(p, 0x80) }
+            switch success
+            case 0 {
+                revert(p, 0x80)
+            }
 
- 			//Store Return Data
- 			mstore(p2, mload(p))
- 			mstore(add(p2, 0x20), mload(add(p,0x20)))
+            //Store Return Data
+            mstore(p2, mload(p))
+            mstore(add(p2, 0x20), mload(add(p, 0x20)))
         }
     }
 
-    function ecMul(uint256[2] memory p0, uint256 s)
-        public returns (uint256[2] memory p1)
-    {
+    function ecMul(uint256[2] memory p0, uint256 s) public returns (uint256[2] memory p1) {
         assembly {
             //Get Free Memory Pointer
             let p := mload(0x40)
@@ -73,20 +75,21 @@ contract Signature {
             mstore(add(p, 0x40), s)
 
             //Call ECAdd
-            let success := call(sub(gas(),2000), 0x07, 0, p, 0x60, p, 0x40)
+            let success := call(sub(gas(), 2000), 0x07, 0, p, 0x60, p, 0x40)
 
             // Use "invalid" to make gas estimation work
- 			switch success case 0 { invalid() }
+            switch success
+            case 0 {
+                invalid()
+            }
 
- 			//Store Return Data
- 			mstore(p1, mload(p))
- 			mstore(add(p1, 0x20), mload(add(p,0x20)))
+            //Store Return Data
+            mstore(p1, mload(p))
+            mstore(add(p1, 0x20), mload(add(p, 0x20)))
         }
     }
 
-    function CompressPoint(uint256[2] memory Pin)
-        public returns (uint256 Pout)
-    {
+    function CompressPoint(uint256[2] memory Pin) public returns (uint256 Pout) {
         //Store x value
         Pout = Pin[0];
 
@@ -96,10 +99,8 @@ contract Signature {
         }
     }
 
-    function EvaluateCurve(uint256 x)
-        public returns (uint256 y, bool onCurve)
-    {
-        uint256 y_squared = mulmod(x,x, P);
+    function EvaluateCurve(uint256 x) public returns (uint256 y, bool onCurve) {
+        uint256 y_squared = mulmod(x, x, P);
         y_squared = mulmod(y_squared, x, P);
         y_squared = addmod(y_squared, 3, P);
 
@@ -111,35 +112,35 @@ contract Signature {
             let p := mload(0x40)
 
             //Store Data for Big Int Mod Exp Call
-            mstore(p, 0x20)                 //Length of Base
-            mstore(add(p, 0x20), 0x20)      //Length of Exponent
-            mstore(add(p, 0x40), 0x20)      //Length of Modulus
+            mstore(p, 0x20) //Length of Base
+            mstore(add(p, 0x20), 0x20) //Length of Exponent
+            mstore(add(p, 0x40), 0x20) //Length of Modulus
             mstore(add(p, 0x60), y_squared) //Base
-            mstore(add(p, 0x80), a_local)   //Exponent
-            mstore(add(p, 0xA0), p_local)   //Modulus
+            mstore(add(p, 0x80), a_local) //Exponent
+            mstore(add(p, 0xA0), p_local) //Modulus
             //Call Big Int Mod Exp
-            let success := call(sub(gas(),2000), 0x05, 0, p, 0xC0, p, 0x20)
+            let success := call(sub(gas(), 2000), 0x05, 0, p, 0xC0, p, 0x20)
 
             // Use "invalid" to make gas estimation work
- 			switch success case 0 { revert(p, 0xC0) }
+            switch success
+            case 0 {
+                revert(p, 0xC0)
+            }
 
- 			//Store Return Data
- 			y := mload(p)
+            //Store Return Data
+            y := mload(p)
         }
         //Check Answer
         onCurve = (y_squared == mulmod(y, y, P));
         evaluate_y = y;
         x_on_curve = onCurve;
-
     }
 
-    function getEvaluate() public view returns(uint256, bool){
+    function getEvaluate() public view returns (uint256, bool) {
         return (evaluate_y, x_on_curve);
     }
 
-    function ExpandPoint(uint256 Pin)
-        public returns (uint256[2] memory Pout)
-    {
+    function ExpandPoint(uint256 Pin) public returns (uint256[2] memory Pout) {
         //Get x value (mask out sign bit)
         Pout[0] = Pin & (~ECSignMask);
 
@@ -152,8 +153,7 @@ contract Signature {
         if (!onCurve) {
             Pout[0] = 0;
             Pout[1] = 0;
-        }
-        else {
+        } else {
             //Use Positive Y
             if ((Pin & ECSignMask) != 0) {
                 if ((y & 0x1) == 0x1) {
@@ -174,25 +174,27 @@ contract Signature {
     }
 
     //=====Ring Signature Functions=====
-    function HashFunction(uint256 message, uint256[2] memory left, uint256[2] memory right)
-        public returns (uint256)
-    {
-        hash_function = (uint256(keccak256(abi.encodePacked(message, left[0], left[1], right[0], right[1]))) % N);
+    function HashFunction(
+        uint256 message,
+        uint256[2] memory left,
+        uint256[2] memory right
+    ) public returns (uint256) {
+        hash_function = (uint256(
+            keccak256(abi.encodePacked(message, left[0], left[1], right[0], right[1]))
+        ) % N);
         return hash_function;
     }
 
-    function getHashFunction() public returns(uint256){
+    function getHashFunction() public returns (uint256) {
         return hash_function;
     }
 
     //Return H = alt_bn128 evaluated at keccak256(p)
-    function HashPoint(uint256[2] memory p)
-        public returns (uint256[2] memory h)
-    {
+    function HashPoint(uint256[2] memory p) public returns (uint256[2] memory h) {
         bool onCurve;
         h[0] = uint256(keccak256(abi.encode(p[0]))) % N;
 
-        while(!onCurve) {
+        while (!onCurve) {
             (h[1], onCurve) = EvaluateCurve(h[0]);
             h[0]++;
         }
@@ -200,21 +202,21 @@ contract Signature {
         hash_point = h;
     }
 
-    function getHashPoint() public returns(uint256[2] memory){
+    function getHashPoint() public returns (uint256[2] memory) {
         return hash_point;
     }
 
-    function KeyImage(uint256 xk, uint256[2] memory Pk)
-        public returns (uint256[2] memory Ix)
-    {
+    function KeyImage(uint256 xk, uint256[2] memory Pk) public returns (uint256[2] memory Ix) {
         //Ix = xk * HashPoint(Pk)
         Ix = HashPoint(Pk);
         Ix = ecMul(Ix, xk);
     }
 
-    function RingStartingSegment(uint256 message, uint256 alpha, uint256[2] memory P0)
-        public returns (uint256 c0)
-    {
+    function RingStartingSegment(
+        uint256 message,
+        uint256 alpha,
+        uint256[2] memory P0
+    ) public returns (uint256 c0) {
         //Memory Registers
         uint256[2] memory left;
         uint256[2] memory right;
@@ -225,10 +227,15 @@ contract Signature {
 
         c0 = HashFunction(message, left, right);
     }
+
     //c0 needs to be c0*nonce
-    function RingSegment(uint256 message, uint256 c0, uint256 s0, uint256[2] memory P0, uint256[2] memory Ix)
-        internal returns (uint256 c1)
-    {
+    function RingSegment(
+        uint256 message,
+        uint256 c0,
+        uint256 s0,
+        uint256[2] memory P0,
+        uint256[2] memory Ix
+    ) internal returns (uint256 c1) {
         //Memory Registers
         uint256[2] memory temp;
         uint256[2] memory left;
@@ -250,10 +257,9 @@ contract Signature {
 
         c1 = HashFunction(message, left, right);
     }
+
     //SubMul = (u - c*xk) % N
-    function SubMul(uint256 u, uint256 c, uint256 xk)
-        public returns (uint256 s)
-    {
+    function SubMul(uint256 u, uint256 c, uint256 xk) public returns (uint256 s) {
         s = mulmod(c, xk, N);
         s = N - s;
         s = addmod(u, s, N);
@@ -278,13 +284,11 @@ contract Signature {
     //      signature[2*N+2 ... 31     ] - Padding (0)
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
 
-    function RingSign(uint256 message, uint256[] memory data)
-        public returns (uint256[32] memory)
-    {
+    function RingSign(uint256 message, uint256[] memory data) public returns (uint256[32] memory) {
         //Check Array Lengths
-        require(data.length >= 6, "Not enough signature value"); //Minimum size (2 PubKeys) = (2*2+2) = 6
-        require(data.length <= 32, "Too much data"); //Max size - will only output 32 uint256's
-        require((data.length % 2) == 0, "Uneven data length"); //data.length must be even
+        require(data.length >= 6, 'Not enough signature value'); //Minimum size (2 PubKeys) = (2*2+2) = 6
+        require(data.length <= 32, 'Too much data'); //Max size - will only output 32 uint256's
+        require((data.length % 2) == 0, 'Uneven data length'); //data.length must be even
         uint256 ring_size = (data.length - 2) / 2;
         uint i;
 
@@ -302,21 +306,21 @@ contract Signature {
         i = (data[0] + 1) % ring_size;
 
         //Calculate Key Image
-        pubkey = ExpandPoint(data[2+ring_size+data[0]]);//Check whether correctly expanded
-        keyimage = KeyImage(data[1],  pubkey);
+        pubkey = ExpandPoint(data[2 + ring_size + data[0]]); //Check whether correctly expanded
+        keyimage = KeyImage(data[1], pubkey);
         ring_signature[0] = CompressPoint(keyimage);
 
         //Calculate Starting c = hash( message, u*G1, u*HashPoint(Pk) )
-        c = RingStartingSegment(message, data[2+data[0]], pubkey);
+        c = RingStartingSegment(message, data[2 + data[0]], pubkey);
         if (i == 0) {
             ring_signature[1] = c;
         }
 
-        for (; i != data[0];) {
+        for (; i != data[0]; ) {
             //Deserialize Point and calculate next Ring Segment
-            pubkey = ExpandPoint(data[2+ring_size+i]);
+            pubkey = ExpandPoint(data[2 + ring_size + i]);
 
-            c = RingSegment(message, c, data[2+i], pubkey, keyimage);
+            c = RingSegment(message, c, data[2 + i], pubkey, keyimage);
 
             //Increment Counters
             i = i + 1;
@@ -329,11 +333,11 @@ contract Signature {
         }
         //Calculate s s.t. alpha*G1 = c1*P1 + s1*G1 = (c1*x1 + s1) * G1
         //s = alpha - c1*x1*nonce
-        ring_signature[2+data[0]] = SubMul(data[2+data[0]], c, data[1]);
+        ring_signature[2 + data[0]] = SubMul(data[2 + data[0]], c, data[1]);
         return ring_signature;
     }
 
-    function getSignature() public view returns(uint[32] memory){
+    function getSignature() public view returns (uint[32] memory) {
         return ring_signature;
     }
 
@@ -348,9 +352,7 @@ contract Signature {
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
     //Outputs:
     //  success (bool) - true/false indicating if signature is valid on message
-    function RingVerify(uint256 message, uint256[] memory signature)
-        public returns (bool success)
-    {
+    function RingVerify(uint256 message, uint256[] memory signature) public returns (bool success) {
         //Check Array Lengths
         require(signature.length >= 6, 'More mix-in keys needed'); //Minimum size (2 PubKeys) = (2*2+2) = 6
         require(signature.length % 2 == 0, 'Data length even'); //data.length must be even
@@ -365,10 +367,10 @@ contract Signature {
 
         //Verify Ring
         uint256 ring_size = (signature.length - 2) / 2;
-        for (uint i = 0; i < ring_size;i++) {
+        for (uint i = 0; i < ring_size; i++) {
             //Deserialize Point and calculate next Ring Segment
-            pubkey = ExpandPoint(signature[2+ring_size+i]);
-            c = RingSegment(message, c, signature[2+i], pubkey, keyimage);
+            pubkey = ExpandPoint(signature[2 + ring_size + i]);
+            c = RingSegment(message, c, signature[2 + i], pubkey, keyimage);
         }
 
         success = (c == signature[1]);
