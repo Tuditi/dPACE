@@ -31,7 +31,7 @@
 // 	genParam0 == enc(genParam0Dec, genParam0R, genParam0PK)
 // 	return 1
 pragma solidity ^0.5.0;
-import './verify_libs.sol';
+import "./verify_libs.sol";
 
 contract Verify_deployRenter {
     using Pairing for *;
@@ -156,7 +156,7 @@ contract Verify_deployRenter {
             inputValues[i] = input[i];
         }
         if (verify(inputValues, proof) == 0) {
-            emit Verified('Transaction successfully verified.');
+            emit Verified("Transaction successfully verified.");
             return true;
         } else {
             return false;

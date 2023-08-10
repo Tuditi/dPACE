@@ -30,7 +30,7 @@
 // 	genParam0 == if dec(genHelper0, genHelper0SK) >= genHelper1 then 1 else 0 fi
 // 	return 1
 pragma solidity ^0.5.0;
-import './verify_libs.sol';
+import "./verify_libs.sol";
 
 contract Verify_renterBooking {
     using Pairing for *;
@@ -155,7 +155,7 @@ contract Verify_renterBooking {
             inputValues[i] = input[i];
         }
         if (verify(inputValues, proof) == 0) {
-            emit Verified('Transaction successfully verified.');
+            emit Verified("Transaction successfully verified.");
             return true;
         } else {
             return false;

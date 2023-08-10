@@ -286,9 +286,9 @@ contract Signature {
 
     function RingSign(uint256 message, uint256[] memory data) public returns (uint256[32] memory) {
         //Check Array Lengths
-        require(data.length >= 6, 'Not enough signature value'); //Minimum size (2 PubKeys) = (2*2+2) = 6
-        require(data.length <= 32, 'Too much data'); //Max size - will only output 32 uint256's
-        require((data.length % 2) == 0, 'Uneven data length'); //data.length must be even
+        require(data.length >= 6, "Not enough signature value"); //Minimum size (2 PubKeys) = (2*2+2) = 6
+        require(data.length <= 32, "Too much data"); //Max size - will only output 32 uint256's
+        require((data.length % 2) == 0, "Uneven data length"); //data.length must be even
         uint256 ring_size = (data.length - 2) / 2;
         uint i;
 
@@ -354,8 +354,8 @@ contract Signature {
     //  success (bool) - true/false indicating if signature is valid on message
     function RingVerify(uint256 message, uint256[] memory signature) public returns (bool success) {
         //Check Array Lengths
-        require(signature.length >= 6, 'More mix-in keys needed'); //Minimum size (2 PubKeys) = (2*2+2) = 6
-        require(signature.length % 2 == 0, 'Data length even'); //data.length must be even
+        require(signature.length >= 6, "More mix-in keys needed"); //Minimum size (2 PubKeys) = (2*2+2) = 6
+        require(signature.length % 2 == 0, "Data length even"); //data.length must be even
 
         //Memory Registers
         uint256[2] memory pubkey;
