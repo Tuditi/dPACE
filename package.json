@@ -40,11 +40,15 @@
   },
   "devDependencies": {
     "mocha": "^4.1.0",
-    "solhint": "^3.5.1"
+    "prettier": "^2.0.0",
+    "prettier-plugin-solidity": "^1.1.3",
+    "solhint": "^3.5.1",
+    "solhint-plugin-prettier": "^0.0.5"
   },
   "scripts": {
     "test": "mocha --timeout 10000",
-    "solhint": "solhint --fix 'contracts/**/*.sol'"
+    "lint": "solhint --fix 'contracts/**/*.sol'",
+    "format": "./node_modules/.bin/prettier --write contracts/**/*.sol"
   },
   "repository": {
     "type": "git",
